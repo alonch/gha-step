@@ -130,7 +130,6 @@ dist
 .pnp.*
 
 node_modules/
-dist/
 lib/
 coverage/
 *.log
