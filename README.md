@@ -34,16 +34,42 @@ This action allows you to run steps in parallel using a matrix strategy, similar
 
 ## Inputs
 
-### `matrix` (required)
-Matrix configuration in YAML format that defines the combinations to run in parallel. Each key-value pair in the matrix becomes an environment variable with the `MATRIX_` prefix.
+| Input    | Description                                                                | Required | Default |
+|----------|----------------------------------------------------------------------------|----------|----------|
+| matrix   | Matrix configuration in YAML format defining parallel execution combinations | Yes      | -        |
+| steps    | List of steps to execute sequentially for each matrix combination          | Yes      | -        |
+| outputs  | List of outputs to collect from steps                                      | Yes      | -        |
+
+### matrix
+Matrix configuration in YAML format. Each key-value pair becomes an environment variable with the `MATRIX_` prefix.
 
 Example:
+```yaml
+- os: [ubuntu, macos]
+  version: [20.04, 22.04]
+```
 
-| Input   | Description                                | Required |
-|---------|-----------------------------------------------|----------|
-| matrix  | Matrix configuration for parallel execution    | Yes      |
-| steps   | Steps to execute in sequence                  | Yes      |
-| outputs | Output variables to collect from steps        | Yes      |
+### steps
+List of steps to execute. Each step must have:
+- `name`: Step display name
+- `id`: Unique identifier for the step
+- `run`: Shell commands to execute
+
+Example:
+```yaml
+- name: Build
+  id: build
+  run: echo "artifact=example" >> $STEPS_OUTPUTS
+```
+
+### outputs
+List of outputs to collect from all matrix executions.
+
+Example:
+```yaml
+- result: ${ STEPS_TEST_RESULT }
+  artifact: ${ STEPS_BUILD_ARTIFACT }
+```
 
 ## Environment Variables
 
@@ -53,9 +79,34 @@ Example:
 
 ## Outputs
 
-| Output | Description                                |
-|--------|--------------------------------------------|
-| json   | JSON array containing all matrix results    |
+| Output    | Description                                                              |
+|-----------|--------------------------------------------------------------------------|
+| json      | JSON array containing results from all matrix combinations                |
+| outcome   | Overall execution status: 'success', 'failure', or 'cancelled'           |
+
+### json
+Contains an array of objects, each representing a matrix combination execution with:
+- All matrix values used (e.g., os, version)
+- All collected outputs specified in the `outputs` input
+- Execution status and details
+
+Example:
+```json
+[
+  {
+    "os": "ubuntu",
+    "version": "20.04",
+    "result": "OK",
+    "artifact": "ubuntu-20.04"
+  }
+]
+```
+
+### outcome
+Indicates the overall execution status:
+- `success`: All matrix combinations completed successfully
+- `failure`: One or more combinations failed
+- `cancelled`: The workflow was cancelled during execution
 
 ## Example Output
 
