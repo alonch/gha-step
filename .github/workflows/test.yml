@@ -13,6 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build action
+        run: npm run all
+
       - name: Test Basic Matrix
         id: basic-test
         uses: ./
@@ -24,7 +36,7 @@ jobs:
             - name: Generate Output
               id: generate
               run: |
-                echo "platform=${ MATRIX_OS }-${ MATRIX_ARCH }" >> $STEPS_OUTPUTS
+                echo "platform=$MATRIX_OS-$MATRIX_ARCH" >> $STEPS_OUTPUTS
           outputs: |
             - platform: ${ STEPS_GENERATE_PLATFORM }
 
@@ -50,11 +62,11 @@ jobs:
             - name: First Step
               id: first
               run: |
-                echo "config=${ MATRIX_ENV }-config" >> $STEPS_OUTPUTS
+                echo "config=$MATRIX_ENV-config" >> $STEPS_OUTPUTS
             - name: Second Step
               id: second
               run: |
-                echo "result=${ MATRIX_REGION }-${ STEPS_FIRST_CONFIG }" >> $STEPS_OUTPUTS
+                echo "result=$MATRIX_REGION-$STEPS_FIRST_CONFIG" >> $STEPS_OUTPUTS
           outputs: |
             - config: ${ STEPS_FIRST_CONFIG }
             - result: ${ STEPS_SECOND_RESULT }
@@ -81,7 +93,7 @@ jobs:
             - name: Fail Step
               id: fail
               run: |
-                if [ "${ MATRIX_TEST }" = "2" ]; then
+                if [ "$MATRIX_TEST" = "2" ]; then
                   echo "Should fail for test=2"
                   exit 1
                 fi
