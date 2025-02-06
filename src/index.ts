@@ -24,6 +24,36 @@ interface ProcessEnv {
   [key: string]: string;
 }
 
+function validateMatrixConfig(config: any): asserts config is { [key: string]: string[] }[] {
+  if (!Array.isArray(config)) {
+    throw new Error('Matrix configuration must be an array');
+  }
+
+  if (config.length === 0) {
+    throw new Error('Matrix configuration cannot be empty');
+  }
+
+  config.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) {
+      throw new Error(`Matrix entry at index ${index} must be an object`);
+    }
+
+    Object.entries(entry).forEach(([key, value]) => {
+      if (!Array.isArray(value)) {
+        throw new Error(`Matrix entry "${key}" must be an array`);
+      }
+      if (value.length === 0) {
+        throw new Error(`Matrix entry "${key}" cannot be empty`);
+      }
+      value.forEach((item, itemIndex) => {
+        if (typeof item !== 'string') {
+          throw new Error(`Value at index ${itemIndex} in matrix entry "${key}" must be a string`);
+        }
+      });
+    });
+  });
+}
+
 async function run(): Promise<void> {
   try {
     // Parse inputs
@@ -32,11 +62,12 @@ async function run(): Promise<void> {
     const outputsInput = core.getInput('outputs', { required: true });
 
     // Parse YAML inputs
-    const matrixConfig = yaml.parse(matrixInput) as { [key: string]: string[] }[];
+    const matrixConfig = yaml.parse(matrixInput);
+    validateMatrixConfig(matrixConfig);
     const steps = yaml.parse(stepsInput) as StepDefinition[];
     const outputs = yaml.parse(outputsInput);
 
-    if (!matrixConfig || !matrixConfig[0]) {
+    if (!matrixConfig[0]) {
       throw new Error('Invalid matrix configuration');
     }
 
