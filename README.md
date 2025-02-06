@@ -31,6 +31,16 @@ This action allows you to run steps in parallel using a matrix strategy, similar
           echo "testing ${ STEPS_BUILD_ARTIFACT }"
           echo "result=OK" >> $STEPS_OUTPUTS
 ```
+**Output**
+
+```json
+[
+  {"result":"OK","os":"ubuntu","version":"20.04"},
+  {"result":"OK","os":"ubuntu","version":"22.04"},
+  {"result":"OK","os":"macos","version":"20.04"},
+  {"result":"OK","os":"macos","version":"22.04"}
+]
+```
 
 ## Inputs
 
@@ -108,16 +118,6 @@ Indicates the overall execution status:
 - `failure`: One or more combinations failed
 - `cancelled`: The workflow was cancelled during execution
 
-## Example Output
-
-```json
-[
-  {"result":"OK","os":"ubuntu","version":"20.04"},
-  {"result":"OK","os":"ubuntu","version":"22.04"},
-  {"result":"OK","os":"macos","version":"20.04"},
-  {"result":"OK","os":"macos","version":"22.04"}
-]
-```
 
 ## License
 
