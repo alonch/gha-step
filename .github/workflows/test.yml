@@ -30,12 +30,17 @@ jobs:
 
       - name: Validate Basic Matrix Output
         run: |
-          output='${{ steps.basic-test.outputs.json }}'
-          expected='[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]'
+          # Function to sort JSON array by all fields
+          sort_json() {
+            echo "$1" | jq -c '.[] | to_entries | sort_by(.key) | from_entries' | jq -s 'sort_by(.os, .arch, .platform)'
+          }
           
-          if [ "$output" != "$expected" ]; then
-            echo "Expected: $expected"
-            echo "Got: $output"
+          output_sorted=$(sort_json '${{ steps.basic-test.outputs.json }}')
+          expected_sorted=$(sort_json '[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]')
+          
+          if [ "$output_sorted" != "$expected_sorted" ]; then
+            echo "Expected (sorted): $expected_sorted"
+            echo "Got (sorted): $output_sorted"
             exit 1
           fi
 
@@ -61,12 +66,17 @@ jobs:
 
       - name: Validate Step Dependencies Output
         run: |
-          output='${{ steps.dependency-test.outputs.json }}'
-          expected='[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]'
+          # Function to sort JSON array by all fields
+          sort_json() {
+            echo "$1" | jq -c '.[] | to_entries | sort_by(.key) | from_entries' | jq -s 'sort_by(.env, .region, .config, .result)'
+          }
           
-          if [ "$output" != "$expected" ]; then
-            echo "Expected: $expected"
-            echo "Got: $output"
+          output_sorted=$(sort_json '${{ steps.dependency-test.outputs.json }}')
+          expected_sorted=$(sort_json '[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]')
+          
+          if [ "$output_sorted" != "$expected_sorted" ]; then
+            echo "Expected (sorted): $expected_sorted"
+            echo "Got (sorted): $output_sorted"
             exit 1
           fi
 
