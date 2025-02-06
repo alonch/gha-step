@@ -1,0 +1,18 @@
+name: 'GitHub Action Steps with Matrix'
+description: 'Run steps in parallel using matrix strategy'
+inputs:
+  matrix:
+    description: 'Matrix configuration for parallel execution'
+    required: true
+  steps:
+    description: 'Steps to execute in sequence'
+    required: true
+  outputs:
+    description: 'Output variables to collect from steps'
+    required: true
+outputs:
+  json:
+    description: 'JSON output containing all matrix results'
+runs:
+  using: 'node20'
+  main: 'dist/index.js' 

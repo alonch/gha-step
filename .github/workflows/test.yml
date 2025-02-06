@@ -1,0 +1,97 @@
+name: Test Action
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-matrix:
+    runs-on: ubuntu-latest
+    name: Test Matrix Functionality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test Basic Matrix
+        id: basic-test
+        uses: ./
+        with:
+          matrix: |
+            - os: [ubuntu, macos]
+              arch: [amd64, arm64]
+          steps: |
+            - name: Generate Output
+              id: generate
+              run: |
+                echo "platform=${ MATRIX_OS }-${ MATRIX_ARCH }" >> $STEPS_OUTPUTS
+          outputs: |
+            - platform: ${ STEPS_GENERATE_PLATFORM }
+
+      - name: Validate Basic Matrix Output
+        run: |
+          output='${{ steps.basic-test.outputs.json }}'
+          expected='[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]'
+          
+          if [ "$output" != "$expected" ]; then
+            echo "Expected: $expected"
+            echo "Got: $output"
+            exit 1
+          fi
+
+      - name: Test Step Dependencies
+        id: dependency-test
+        uses: ./
+        with:
+          matrix: |
+            - env: [dev, prod]
+              region: [us-east-1, us-west-2]
+          steps: |
+            - name: First Step
+              id: first
+              run: |
+                echo "config=${ MATRIX_ENV }-config" >> $STEPS_OUTPUTS
+            - name: Second Step
+              id: second
+              run: |
+                echo "result=${ MATRIX_REGION }-${ STEPS_FIRST_CONFIG }" >> $STEPS_OUTPUTS
+          outputs: |
+            - config: ${ STEPS_FIRST_CONFIG }
+            - result: ${ STEPS_SECOND_RESULT }
+
+      - name: Validate Step Dependencies Output
+        run: |
+          output='${{ steps.dependency-test.outputs.json }}'
+          expected='[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]'
+          
+          if [ "$output" != "$expected" ]; then
+            echo "Expected: $expected"
+            echo "Got: $output"
+            exit 1
+          fi
+
+      - name: Test Error Handling
+        id: error-test
+        continue-on-error: true
+        uses: ./
+        with:
+          matrix: |
+            - test: [1, 2]
+          steps: |
+            - name: Fail Step
+              id: fail
+              run: |
+                if [ "${ MATRIX_TEST }" = "2" ]; then
+                  echo "Should fail for test=2"
+                  exit 1
+                fi
+                echo "status=ok" >> $STEPS_OUTPUTS
+          outputs: |
+            - status: ${ STEPS_FAIL_STATUS }
+
+      - name: Validate Error Handling
+        run: |
+          if [ "${{ steps.error-test.outcome }}" != "failure" ]; then
+            echo "Expected error-test to fail"
+            exit 1
+          fi 
