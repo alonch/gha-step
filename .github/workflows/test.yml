@@ -30,17 +30,22 @@ jobs:
 
       - name: Validate Basic Matrix Output
         run: |
-          # Function to sort JSON array by all fields
-          sort_json() {
-            echo "$1" | jq -c '.[] | to_entries | sort_by(.key) | from_entries' | jq -s 'sort_by(.os, .arch, .platform)'
-          }
+          # Create temp files for comparison
+          echo '${{ steps.basic-test.outputs.json }}' | jq --sort-keys . > output.json
+          echo '[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]' | jq --sort-keys . > expected.json
           
-          output_sorted=$(sort_json '${{ steps.basic-test.outputs.json }}')
-          expected_sorted=$(sort_json '[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]')
-          
-          if [ "$output_sorted" != "$expected_sorted" ]; then
-            echo "Expected (sorted): $expected_sorted"
-            echo "Got (sorted): $output_sorted"
+          # Compare JSON content ignoring order
+          if ! jq --argfile a output.json --argfile b expected.json -n '
+            def post_sort: sort_by(paths) as $paths | reduce $paths[] as $p ([.]; . + [getpath($p)]); 
+            def normalize: . as $x | reduce (paths(arrays)) as $p (.; setpath($p; getpath($p) | sort));
+            ($a | normalize) as $a | ($b | normalize) as $b | 
+            if $a == $b then true else 
+              $a as $x | $b as $y | 
+              ["Objects are different:", $x, "vs", $y] | halt_error
+            end
+          '; then
+            echo "JSON comparison failed. Showing diff:"
+            diff -u <(jq --sort-keys . output.json) <(jq --sort-keys . expected.json) || true
             exit 1
           fi
 
@@ -66,17 +71,22 @@ jobs:
 
       - name: Validate Step Dependencies Output
         run: |
-          # Function to sort JSON array by all fields
-          sort_json() {
-            echo "$1" | jq -c '.[] | to_entries | sort_by(.key) | from_entries' | jq -s 'sort_by(.env, .region, .config, .result)'
-          }
+          # Create temp files for comparison
+          echo '${{ steps.dependency-test.outputs.json }}' | jq --sort-keys . > output.json
+          echo '[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]' | jq --sort-keys . > expected.json
           
-          output_sorted=$(sort_json '${{ steps.dependency-test.outputs.json }}')
-          expected_sorted=$(sort_json '[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]')
-          
-          if [ "$output_sorted" != "$expected_sorted" ]; then
-            echo "Expected (sorted): $expected_sorted"
-            echo "Got (sorted): $output_sorted"
+          # Compare JSON content ignoring order
+          if ! jq --argfile a output.json --argfile b expected.json -n '
+            def post_sort: sort_by(paths) as $paths | reduce $paths[] as $p ([.]; . + [getpath($p)]); 
+            def normalize: . as $x | reduce (paths(arrays)) as $p (.; setpath($p; getpath($p) | sort));
+            ($a | normalize) as $a | ($b | normalize) as $b | 
+            if $a == $b then true else 
+              $a as $x | $b as $y | 
+              ["Objects are different:", $x, "vs", $y] | halt_error
+            end
+          '; then
+            echo "JSON comparison failed. Showing diff:"
+            diff -u <(jq --sort-keys . output.json) <(jq --sort-keys . expected.json) || true
             exit 1
           fi
 
