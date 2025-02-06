@@ -34,6 +34,11 @@ This action allows you to run steps in parallel using a matrix strategy, similar
 
 ## Inputs
 
+### `matrix` (required)
+Matrix configuration in YAML format that defines the combinations to run in parallel. Each key-value pair in the matrix becomes an environment variable with the `MATRIX_` prefix.
+
+Example:
+
 | Input   | Description                                | Required |
 |---------|-----------------------------------------------|----------|
 | matrix  | Matrix configuration for parallel execution    | Yes      |
