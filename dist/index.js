@@ -25705,7 +25705,6 @@ async function run() {
         const promises = combinations.map(async (combination) => {
             try {
                 const result = await executeSteps(steps, combination);
-                // Ensure we merge in the correct order: combination values first, then results
                 results.push({ ...combination, ...result });
             }
             catch (error) {
@@ -25740,6 +25739,7 @@ function generateMatrixCombinations(matrix) {
 }
 async function executeSteps(steps, matrix) {
     const outputs = {};
+    const stepOutputs = {};
     const env = {
         ...process.env,
         STEPS_OUTPUTS: `steps-outputs-${Object.values(matrix).join('-')}.env`,
@@ -25751,9 +25751,11 @@ async function executeSteps(steps, matrix) {
     });
     for (const step of steps) {
         // Add previous step outputs as environment variables
-        Object.entries(outputs).forEach(([key, value]) => {
-            const envKey = `STEPS_${step.id.toUpperCase()}_${key.toUpperCase()}`;
-            env[envKey] = value;
+        Object.entries(stepOutputs).forEach(([stepId, stepOutput]) => {
+            Object.entries(stepOutput).forEach(([key, value]) => {
+                const envKey = `STEPS_${stepId.toUpperCase()}_${key.toUpperCase()}`;
+                env[envKey] = value;
+            });
         });
         try {
             // Execute step
@@ -25765,14 +25767,16 @@ async function executeSteps(steps, matrix) {
                     return stdout;
                 });
                 // Parse outputs
-                const stepOutputs = outputContent.split('\n')
+                const currentStepOutputs = outputContent.split('\n')
                     .filter(line => line.includes('='))
                     .reduce((acc, line) => {
                     const [key, value] = line.split('=');
                     acc[key.trim()] = value.trim();
                     return acc;
                 }, {});
-                Object.assign(outputs, stepOutputs);
+                // Store outputs both globally and per step
+                Object.assign(outputs, currentStepOutputs);
+                stepOutputs[step.id] = currentStepOutputs;
                 // Clear outputs file
                 await exec.exec('rm', [env.STEPS_OUTPUTS]);
             }
