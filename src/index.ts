@@ -69,9 +69,9 @@ async function run(): Promise<void> {
 function generateMatrixCombinations(matrix: { [key: string]: string[] }): MatrixCombination[] {
   const keys = Object.keys(matrix);
   const values = keys.map(key => matrix[key]);
-  
+
   const cartesian = (...arrays: any[][]): any[][] => {
-    return arrays.reduce((acc: any[][], curr: any[]) => 
+    return arrays.reduce((acc: any[][], curr: any[]) =>
       acc.flatMap((combo: any[]) => curr.map((item: any) => [...combo, item])),
       [[]]
     );
@@ -117,7 +117,7 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
       // Read step outputs
       try {
         const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
-          const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+          const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: false });
           return stdout;
         });
 
@@ -148,4 +148,4 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
   return outputs;
 }
 
-run(); 
+run();
