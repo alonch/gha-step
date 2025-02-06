@@ -25703,8 +25703,15 @@ async function run() {
         const results = [];
         // Execute matrix combinations in parallel
         const promises = combinations.map(async (combination) => {
-            const result = await executeSteps(steps, combination);
-            results.push({ ...combination, ...result });
+            try {
+                const result = await executeSteps(steps, combination);
+                // Ensure we merge in the correct order: combination values first, then results
+                results.push({ ...combination, ...result });
+            }
+            catch (error) {
+                core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
+                throw error;
+            }
         });
         await Promise.all(promises);
         // Set the final output
@@ -25735,7 +25742,7 @@ async function executeSteps(steps, matrix) {
     const outputs = {};
     const env = {
         ...process.env,
-        STEPS_OUTPUTS: 'steps-outputs.env',
+        STEPS_OUTPUTS: `steps-outputs-${Object.values(matrix).join('-')}.env`,
     };
     // Add matrix values as environment variables
     Object.entries(matrix).forEach(([key, value]) => {
@@ -25748,28 +25755,34 @@ async function executeSteps(steps, matrix) {
             const envKey = `STEPS_${step.id.toUpperCase()}_${key.toUpperCase()}`;
             env[envKey] = value;
         });
-        // Execute step
-        await exec.exec('bash', ['-c', step.run], { env });
-        // Read step outputs
         try {
-            const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
-                const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
-                return stdout;
-            });
-            // Parse outputs
-            const stepOutputs = outputContent.split('\n')
-                .filter(line => line.includes('='))
-                .reduce((acc, line) => {
-                const [key, value] = line.split('=');
-                acc[key.trim()] = value.trim();
-                return acc;
-            }, {});
-            Object.assign(outputs, stepOutputs);
-            // Clear outputs file
-            await exec.exec('rm', [env.STEPS_OUTPUTS]);
+            // Execute step
+            await exec.exec('bash', ['-c', step.run], { env });
+            // Read step outputs
+            try {
+                const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
+                    const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+                    return stdout;
+                });
+                // Parse outputs
+                const stepOutputs = outputContent.split('\n')
+                    .filter(line => line.includes('='))
+                    .reduce((acc, line) => {
+                    const [key, value] = line.split('=');
+                    acc[key.trim()] = value.trim();
+                    return acc;
+                }, {});
+                Object.assign(outputs, stepOutputs);
+                // Clear outputs file
+                await exec.exec('rm', [env.STEPS_OUTPUTS]);
+            }
+            catch (error) {
+                core.warning(`No outputs found for step ${step.id}`);
+            }
         }
         catch (error) {
-            core.warning(`No outputs found for step ${step.id}`);
+            core.error(`Step ${step.id} failed: ${error}`);
+            throw error;
         }
     }
     return outputs;
