@@ -25704,8 +25704,8 @@ function validateMatrixConfig(config) {
                 throw new Error(`Matrix entry "${key}" cannot be empty`);
             }
             value.forEach((item, itemIndex) => {
-                if (typeof item !== 'string') {
-                    throw new Error(`Value at index ${itemIndex} in matrix entry "${key}" must be a string`);
+                if (typeof item !== 'string' && typeof item !== 'number') {
+                    throw new Error(`Value at index ${itemIndex} in matrix entry "${key}" must be a string or number`);
                 }
             });
         });
