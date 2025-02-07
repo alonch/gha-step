@@ -30,9 +30,14 @@ jobs:
 
       - name: Validate Basic Matrix Output
         run: |
-          # Sort both JSONs by all fields to ensure consistent ordering
-          output_sorted=$(echo '${{ steps.basic-test.outputs.json }}' | jq -S 'sort_by(.os, .arch, .platform)')
-          expected_sorted=$(echo '[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]' | jq -S 'sort_by(.os, .arch, .platform)')
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort '${{ steps.basic-test.outputs.json }}')
+          expected_sorted=$(normalize_and_sort '[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]')
           
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
@@ -68,9 +73,14 @@ jobs:
 
       - name: Validate Step Dependencies Output
         run: |
-          # Sort both JSONs by all fields to ensure consistent ordering
-          output_sorted=$(echo '${{ steps.dependency-test.outputs.json }}' | jq -S 'sort_by(.env, .region, .config, .result)')
-          expected_sorted=$(echo '[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]' | jq -S 'sort_by(.env, .region, .config, .result)')
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort '${{ steps.dependency-test.outputs.json }}')
+          expected_sorted=$(normalize_and_sort '[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]')
           
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
@@ -191,16 +201,21 @@ jobs:
 
       - name: Validate Include Output
         run: |
-          # Sort both JSONs by all fields to ensure consistent ordering
-          output_sorted=$(echo '${{ steps.include-test.outputs.json }}' | jq -S 'sort_by(.fruit, .animal, .color, .shape, .combo)')
-          expected_sorted=$(echo '[
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort '${{ steps.include-test.outputs.json }}')
+          expected_sorted=$(normalize_and_sort '[
             {"fruit":"apple","animal":"cat","color":"pink","shape":"circle","combo":"apple-cat-pink-circle"},
             {"fruit":"apple","animal":"dog","color":"green","shape":"circle","combo":"apple-dog-green-circle"},
             {"fruit":"pear","animal":"cat","color":"pink","combo":"pear-cat-pink"},
             {"fruit":"pear","animal":"dog","color":"green","combo":"pear-dog-green"},
             {"fruit":"banana","combo":"banana"},
             {"fruit":"banana","animal":"cat","combo":"banana-cat"}
-          ]' | jq -S 'sort_by(.fruit, .animal, .color, .shape, .combo)')
+          ]')
           
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
@@ -243,15 +258,20 @@ jobs:
 
       - name: Validate Include-Only Output
         run: |
-          # Sort both JSONs by all fields to ensure consistent ordering
-          output_sorted=$(echo '${{ steps.include-only-test.outputs.json }}' | jq -S 'sort_by(.color, .animal, .fruit, .shape, .combo)')
-          expected_sorted=$(echo '[
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort '${{ steps.include-only-test.outputs.json }}')
+          expected_sorted=$(normalize_and_sort '[
             {"color":"green","combo":"green"},
             {"color":"pink","animal":"cat","combo":"pink-cat"},
             {"fruit":"apple","shape":"circle","combo":"apple-circle"},
             {"fruit":"banana","combo":"banana"},
             {"fruit":"banana","animal":"cat","combo":"banana-cat"}
-          ]' | jq -S 'sort_by(.color, .animal, .fruit, .shape, .combo)')
+          ]')
           
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
@@ -286,15 +306,20 @@ jobs:
 
       - name: Validate JSON Include Output
         run: |
-          # Sort both JSONs by all fields to ensure consistent ordering
-          output_sorted=$(echo '${{ steps.json-include-test.outputs.json }}' | jq -S 'sort_by(.color, .animal, .fruit, .shape, .combo)')
-          expected_sorted=$(echo '[
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort '${{ steps.json-include-test.outputs.json }}')
+          expected_sorted=$(normalize_and_sort '[
             {"color":"green","combo":"green"},
             {"color":"pink","animal":"cat","combo":"pink-cat"},
             {"fruit":"apple","shape":"circle","combo":"apple-circle"},
             {"fruit":"banana","combo":"banana"},
             {"fruit":"banana","animal":"cat","combo":"banana-cat"}
-          ]' | jq -S 'sort_by(.color, .animal, .fruit, .shape, .combo)')
+          ]')
           
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
