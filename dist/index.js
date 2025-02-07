@@ -25943,7 +25943,9 @@ function collectStepOutputs(outputs) {
         if (!valueMap.has(key)) {
             valueMap.set(key, new Set());
         }
-        valueMap.get(key).add(value);
+        // Split value by comma and add each part
+        const values = value.split(',').map(v => v.trim());
+        values.forEach(v => valueMap.get(key).add(v));
     }
     // Convert to final output format
     const result = {};
