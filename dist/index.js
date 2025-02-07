@@ -25783,20 +25783,80 @@ async function run() {
         }
     }
 }
-function generateMatrixCombinations(matrix) {
-    const keys = Object.keys(matrix);
-    const values = keys.map(key => matrix[key]);
-    const cartesian = (...arrays) => {
-        return arrays.reduce((acc, curr) => acc.flatMap((combo) => curr.map((item) => [...combo, item])), [[]]);
-    };
-    const combinations = cartesian(...values);
-    return combinations.map((combo) => {
-        const result = {};
-        keys.forEach((key, index) => {
-            result[key] = combo[index];
-        });
-        return result;
-    });
+function generateMatrixCombinations(matrixConfig) {
+    const combinations = [];
+    // Handle regular matrix combinations
+    const regularEntries = Object.entries(matrixConfig).filter(([key]) => key !== 'include');
+    if (regularEntries.length > 0) {
+        const keys = regularEntries.map(([key]) => key);
+        const values = regularEntries.map(([_, value]) => value);
+        const cartesian = (...arrays) => {
+            return arrays.reduce((acc, curr) => acc.flatMap((combo) => curr.map((item) => [...combo, item])), [[]]);
+        };
+        const baseCombinations = cartesian(...values);
+        combinations.push(...baseCombinations.map((combo) => {
+            const result = {};
+            keys.forEach((key, index) => {
+                result[key] = String(combo[index]);
+            });
+            return result;
+        }));
+    }
+    // Handle includes
+    if (matrixConfig.include) {
+        let includes = [];
+        if (typeof matrixConfig.include === 'string') {
+            // Parse JSON string include
+            try {
+                includes = JSON.parse(matrixConfig.include);
+            }
+            catch (error) {
+                throw new Error(`Failed to parse include JSON string: ${error}`);
+            }
+        }
+        else if (Array.isArray(matrixConfig.include)) {
+            includes = matrixConfig.include;
+        }
+        // Process each include entry
+        for (const include of includes) {
+            if (combinations.length === 0) {
+                // If no base combinations, add include as a new combination
+                combinations.push(Object.entries(include).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {}));
+            }
+            else {
+                // Add include properties to matching combinations or create new ones
+                let added = false;
+                const includeEntries = Object.entries(include);
+                // Try to add to existing combinations
+                combinations.forEach(combination => {
+                    let canAdd = true;
+                    for (const [key, value] of includeEntries) {
+                        if (key in combination && combination[key] !== String(value)) {
+                            canAdd = false;
+                            break;
+                        }
+                    }
+                    if (canAdd) {
+                        added = true;
+                        for (const [key, value] of includeEntries) {
+                            combination[key] = String(value);
+                        }
+                    }
+                });
+                // If couldn't add to any existing combination, create a new one
+                if (!added) {
+                    combinations.push(Object.entries(include).reduce((acc, [key, value]) => {
+                        acc[key] = String(value);
+                        return acc;
+                    }, {}));
+                }
+            }
+        }
+    }
+    return combinations;
 }
 async function executeSteps(steps, matrix) {
     const outputs = {};

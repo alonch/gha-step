@@ -24,6 +24,10 @@ interface ProcessEnv {
   [key: string]: string;
 }
 
+interface MatrixInclude {
+  [key: string]: string | number;
+}
+
 function validateMatrixConfig(config: any): asserts config is { [key: string]: string[] | any[] }[] {
   if (!Array.isArray(config)) {
     throw new Error('Matrix configuration must be an array');
@@ -127,25 +131,89 @@ async function run(): Promise<void> {
   }
 }
 
-function generateMatrixCombinations(matrix: { [key: string]: string[] }): MatrixCombination[] {
-  const keys = Object.keys(matrix);
-  const values = keys.map(key => matrix[key]);
+function generateMatrixCombinations(matrixConfig: { [key: string]: any }): MatrixCombination[] {
+  const combinations: MatrixCombination[] = [];
+  
+  // Handle regular matrix combinations
+  const regularEntries = Object.entries(matrixConfig).filter(([key]) => key !== 'include');
+  if (regularEntries.length > 0) {
+    const keys = regularEntries.map(([key]) => key);
+    const values = regularEntries.map(([_, value]) => value);
 
-  const cartesian = (...arrays: any[][]): any[][] => {
-    return arrays.reduce((acc: any[][], curr: any[]) =>
-      acc.flatMap((combo: any[]) => curr.map((item: any) => [...combo, item])),
-      [[]]
-    );
-  };
+    const cartesian = (...arrays: any[][]): any[][] => {
+      return arrays.reduce((acc: any[][], curr: any[]) =>
+        acc.flatMap((combo: any[]) => curr.map((item: any) => [...combo, item])),
+        [[]]
+      );
+    };
 
-  const combinations = cartesian(...values);
-  return combinations.map((combo: string[]) => {
-    const result: MatrixCombination = {};
-    keys.forEach((key, index) => {
-      result[key] = combo[index];
-    });
-    return result;
-  });
+    const baseCombinations = cartesian(...values);
+    combinations.push(...baseCombinations.map((combo: (string | number)[]) => {
+      const result: MatrixCombination = {};
+      keys.forEach((key, index) => {
+        result[key] = String(combo[index]);
+      });
+      return result;
+    }));
+  }
+
+  // Handle includes
+  if (matrixConfig.include) {
+    let includes: MatrixInclude[] = [];
+    
+    if (typeof matrixConfig.include === 'string') {
+      // Parse JSON string include
+      try {
+        includes = JSON.parse(matrixConfig.include);
+      } catch (error) {
+        throw new Error(`Failed to parse include JSON string: ${error}`);
+      }
+    } else if (Array.isArray(matrixConfig.include)) {
+      includes = matrixConfig.include;
+    }
+
+    // Process each include entry
+    for (const include of includes) {
+      if (combinations.length === 0) {
+        // If no base combinations, add include as a new combination
+        combinations.push(Object.entries(include).reduce((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {} as MatrixCombination));
+      } else {
+        // Add include properties to matching combinations or create new ones
+        let added = false;
+        const includeEntries = Object.entries(include);
+        
+        // Try to add to existing combinations
+        combinations.forEach(combination => {
+          let canAdd = true;
+          for (const [key, value] of includeEntries) {
+            if (key in combination && combination[key] !== String(value)) {
+              canAdd = false;
+              break;
+            }
+          }
+          if (canAdd) {
+            added = true;
+            for (const [key, value] of includeEntries) {
+              combination[key] = String(value);
+            }
+          }
+        });
+
+        // If couldn't add to any existing combination, create a new one
+        if (!added) {
+          combinations.push(Object.entries(include).reduce((acc, [key, value]) => {
+            acc[key] = String(value);
+            return acc;
+          }, {} as MatrixCombination));
+        }
+      }
+    }
+  }
+
+  return combinations;
 }
 
 async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination): Promise<StepOutputs> {
