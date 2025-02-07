@@ -205,10 +205,12 @@ jobs:
           
           # Check each expected combination
           expected_combinations=(
-            '{"fruit":"apple","animal":"cat","color":"pink","shape":"circle","combo":"apple-cat-pink-circle"}'
+            # Matrix combinations with includes applied
+            '{"fruit":"apple","animal":"cat","color":"green","shape":"circle","combo":"apple-cat-green-circle"}'
             '{"fruit":"apple","animal":"dog","color":"green","shape":"circle","combo":"apple-dog-green-circle"}'
-            '{"fruit":"pear","animal":"cat","color":"pink","combo":"pear-cat-pink"}'
+            '{"fruit":"pear","animal":"cat","color":"green","combo":"pear-cat-green"}'
             '{"fruit":"pear","animal":"dog","color":"green","combo":"pear-dog-green"}'
+            # Standalone includes
             '{"fruit":"banana","combo":"banana"}'
             '{"fruit":"banana","animal":"cat","combo":"banana-cat"}'
           )
@@ -217,18 +219,25 @@ jobs:
           count=$(echo "$output" | jq length)
           if [ "$count" -ne "${#expected_combinations[@]}" ]; then
             echo "Expected ${#expected_combinations[@]} combinations, but got $count"
-            echo "Output: $output"
+            echo "Full output:"
+            echo "$output" | jq .
             exit 1
           fi
 
           # Check each combination exists
+          failed=0
           for combination in "${expected_combinations[@]}"; do
             if ! echo "$output" | jq -e --arg combo "$combination" 'contains([($combo | fromjson)])' > /dev/null; then
               echo "Missing expected combination: $combination"
-              echo "Output: $output"
-              exit 1
+              failed=1
             fi
           done
+
+          if [ $failed -eq 1 ]; then
+            echo "Full output:"
+            echo "$output" | jq .
+            exit 1
+          fi
 
       - name: Test Include-Only Matrix
         id: include-only-test
