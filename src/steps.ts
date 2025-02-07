@@ -18,11 +18,13 @@ export function collectStepOutputs(outputs: string[]): StepOutputs {
       // If we already have this key
       const existing = result[key];
       if (Array.isArray(existing)) {
-        // If it's already an array, append to it
-        existing.push(value);
+        // If it's already an array, append to it only if not already present
+        if (!existing.includes(value)) {
+          existing.push(value);
+        }
       } else {
-        // Convert to array with both values
-        result[key] = [existing, value];
+        // Convert to array with both values only if they're different
+        result[key] = existing === value ? existing : [existing, value];
       }
     } else {
       // First occurrence of this key

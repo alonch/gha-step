@@ -24,7 +24,10 @@ jobs:
             - name: Generate Output
               id: generate
               run: |
-                echo "platform=$MATRIX_OS-$MATRIX_ARCH" >> $STEPS_OUTPUTS
+                # Ensure we write each combination only once
+                if [ ! -f "steps-outputs-$MATRIX_OS-$MATRIX_ARCH.env" ]; then
+                  echo "platform=$MATRIX_OS-$MATRIX_ARCH" >> $STEPS_OUTPUTS
+                fi
           outputs: |
             - platform: ${ STEPS_GENERATE_PLATFORM }
 

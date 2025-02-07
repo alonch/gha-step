@@ -76,4 +76,33 @@ describe('collectStepOutputs', () => {
     // Verify the exact order
     expect(result.os).toEqual(['mac', 'ubuntu', 'windows']);
   });
+
+  it('should handle duplicate values as a set', () => {
+    const outputs = [
+      'os=mac',
+      'os=ubuntu',
+      'os=mac',      // Duplicate
+      'os=windows',
+      'os=ubuntu',   // Duplicate
+      'os=mac'       // Duplicate
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      os: ['mac', 'ubuntu', 'windows']
+    });
+  });
+
+  it('should keep single value when duplicates exist', () => {
+    const outputs = [
+      'os=mac',
+      'os=mac',
+      'os=mac'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      os: 'mac'
+    });
+  });
 }); 
