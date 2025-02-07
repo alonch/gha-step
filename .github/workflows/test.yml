@@ -108,4 +108,57 @@ jobs:
           if [ "${{ steps.error-test.outcome }}" != "failure" ]; then
             echo "Expected error-test to fail"
             exit 1
+          fi
+
+      - name: Start Timer
+        id: start-timer
+        run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Test Parallel Execution (Default)
+        id: parallel-test
+        uses: ./
+        with:
+          matrix: |
+            - number: [1, 2, 3, 4, 5]
+          steps: |
+            - name: Sleep Step
+              run: sleep 1
+
+      - name: Validate Parallel Execution
+        run: |
+          end_time=$(date +%s)
+          start_time=${{ steps.start-timer.outputs.start_time }}
+          duration=$((end_time - start_time))
+          
+          # Should complete in roughly 1-2 seconds since running in parallel
+          if [ $duration -gt 3 ]; then
+            echo "Execution took too long ($duration seconds), expected parallel execution"
+            exit 1
+          fi
+
+      - name: Start Timer
+        id: start-timer-sequential
+        run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Test Sequential Execution
+        id: sequential-test
+        uses: ./
+        with:
+          matrix: |
+            - number: [1, 2, 3, 4, 5]
+          max-parallel: 1
+          steps: |
+            - name: Sleep Step
+              run: sleep 1
+
+      - name: Validate Sequential Execution
+        run: |
+          end_time=$(date +%s)
+          start_time=${{ steps.start-timer-sequential.outputs.start_time }}
+          duration=$((end_time - start_time))
+          
+          # Should take at least 5 seconds since running sequentially
+          if [ $duration -lt 4 ]; then
+            echo "Execution too fast ($duration seconds), expected sequential execution"
+            exit 1
           fi 

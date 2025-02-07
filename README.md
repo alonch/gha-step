@@ -44,11 +44,12 @@ This action allows you to run steps in parallel using a matrix strategy, similar
 
 ## Inputs
 
-| Input    | Description                                                                | Required | Default |
-|----------|----------------------------------------------------------------------------|----------|----------|
-| matrix   | Matrix configuration in YAML format defining parallel execution combinations | Yes      | -        |
-| steps    | List of steps to execute sequentially for each matrix combination          | Yes      | -        |
-| outputs  | List of outputs to collect from steps                                      | Yes      | -        |
+| Input        | Description                                                                | Required | Default |
+|--------------|----------------------------------------------------------------------------|----------|----------|
+| matrix       | Matrix configuration in YAML format defining parallel execution combinations | Yes      | -        |
+| steps        | List of steps to execute sequentially for each matrix combination          | Yes      | -        |
+| outputs      | List of outputs to collect from steps                                      | Yes      | -        |
+| max-parallel | Maximum number of matrix combinations to run in parallel                    | No       | ∞        |
 
 ### matrix
 Matrix configuration in YAML format. Each key-value pair becomes an environment variable with the `MATRIX_` prefix.
