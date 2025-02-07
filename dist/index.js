@@ -25875,7 +25875,19 @@ async function executeSteps(steps, matrix) {
     // Add matrix values as environment variables
     Object.entries(matrix).forEach(([key, value]) => {
         const envKey = `MATRIX_${key.toUpperCase()}`;
-        env[envKey] = value;
+        // If value contains commas, it's a comma-separated list that should be expanded
+        if (value.includes(',')) {
+            const values = value.split(',').map(v => v.trim());
+            values.forEach((v, i) => {
+                env[`${envKey}_${i}`] = v;
+                if (i === 0)
+                    env[envKey] = v; // First value is also available without index
+            });
+            env[`${envKey}_ALL`] = value; // Full list available with _ALL suffix
+        }
+        else {
+            env[envKey] = value;
+        }
     });
     for (const step of steps) {
         // Add previous step outputs as environment variables
@@ -25943,8 +25955,19 @@ function collectStepOutputs(outputs) {
         if (!valueMap.has(key)) {
             valueMap.set(key, new Set());
         }
-        // Add the value as is, without splitting
-        valueMap.get(key).add(value);
+        // Handle both CSV and repeated values:
+        // 1. If the value contains commas, split it and add each part
+        // 2. If it's a single value, add it directly
+        // The Set will automatically handle duplicates
+        if (value.includes(',')) {
+            value.split(',')
+                .map(v => v.trim())
+                .filter(v => v) // Skip empty values after splitting
+                .forEach(v => valueMap.get(key).add(v));
+        }
+        else {
+            valueMap.get(key).add(value.trim());
+        }
     }
     // Convert to final output format
     const result = {};

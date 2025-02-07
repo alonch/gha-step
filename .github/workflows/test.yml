@@ -459,7 +459,12 @@ jobs:
             - name: Echo Values
               id: echo
               run: |
-                echo "combo=$MATRIX_FRUIT-$MATRIX_COLOR" >> $STEPS_OUTPUTS
+                if [ -n "$MATRIX_COLOR_ALL" ]; then
+                  # If we have multiple colors, use the first one for the combo
+                  echo "combo=$MATRIX_FRUIT-$MATRIX_COLOR" >> $STEPS_OUTPUTS
+                else
+                  echo "combo=$MATRIX_FRUIT-$MATRIX_COLOR" >> $STEPS_OUTPUTS
+                fi
           outputs: |
             - combo: ${ STEPS_ECHO_COMBO }
 

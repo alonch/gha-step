@@ -20,8 +20,18 @@ export function collectStepOutputs(outputs: string[]): StepOutputs {
       valueMap.set(key, new Set());
     }
 
-    // Add the value as is, without splitting
-    valueMap.get(key)!.add(value);
+    // Handle both CSV and repeated values:
+    // 1. If the value contains commas, split it and add each part
+    // 2. If it's a single value, add it directly
+    // The Set will automatically handle duplicates
+    if (value.includes(',')) {
+      value.split(',')
+        .map(v => v.trim())
+        .filter(v => v) // Skip empty values after splitting
+        .forEach(v => valueMap.get(key)!.add(v));
+    } else {
+      valueMap.get(key)!.add(value.trim());
+    }
   }
 
   // Convert to final output format
