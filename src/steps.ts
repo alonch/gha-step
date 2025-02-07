@@ -20,9 +20,8 @@ export function collectStepOutputs(outputs: string[]): StepOutputs {
       valueMap.set(key, new Set());
     }
 
-    // Split value by comma and add each part
-    const values = value.split(',').map(v => v.trim());
-    values.forEach(v => valueMap.get(key)!.add(v));
+    // Add the value as is, without splitting
+    valueMap.get(key)!.add(value);
   }
 
   // Convert to final output format

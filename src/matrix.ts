@@ -7,9 +7,19 @@ interface MatrixInclude {
 }
 
 function expandInclude(include: MatrixInclude): MatrixCombination[] {
+  // Convert any comma-separated strings to arrays
+  const processedInclude = Object.fromEntries(
+    Object.entries(include).map(([key, value]) => {
+      if (typeof value === 'string' && value.includes(',')) {
+        return [key, value.split(',').map(v => v.trim())];
+      }
+      return [key, value];
+    })
+  );
+
   // Find all array values and their keys
-  const arrayEntries = Object.entries(include).filter(([_, value]) => Array.isArray(value));
-  const scalarEntries = Object.entries(include).filter(([_, value]) => !Array.isArray(value));
+  const arrayEntries = Object.entries(processedInclude).filter(([_, value]) => Array.isArray(value));
+  const scalarEntries = Object.entries(processedInclude).filter(([_, value]) => !Array.isArray(value));
 
   // If no arrays, return a single combination with all values as strings
   if (arrayEntries.length === 0) {
