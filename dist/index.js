@@ -25825,35 +25825,42 @@ function generateMatrixCombinations(matrixConfig) {
             }, {});
             if (combinations.length === 0) {
                 // If no base combinations, add include as a new combination
-                combinations.push(stringifiedInclude);
+                combinations.push({ ...stringifiedInclude });
+                continue;
+            }
+            // Check if this include should modify existing combinations or create a new one
+            let shouldAddNew = true;
+            const newCombinations = [];
+            // Try to add to existing combinations
+            combinations.forEach(combination => {
+                let canEnhance = true;
+                // Check if this combination can be enhanced with the include
+                for (const [key, value] of Object.entries(stringifiedInclude)) {
+                    if (key in combination && combination[key] !== value) {
+                        canEnhance = false;
+                        break;
+                    }
+                }
+                if (canEnhance) {
+                    shouldAddNew = false;
+                    // Create a new combination with the include values
+                    const enhanced = { ...combination };
+                    for (const [key, value] of Object.entries(stringifiedInclude)) {
+                        if (!(key in enhanced)) {
+                            enhanced[key] = value;
+                        }
+                    }
+                    newCombinations.push(enhanced);
+                }
+            });
+            if (shouldAddNew) {
+                // Add as a new combination if it couldn't enhance any existing ones
+                combinations.push({ ...stringifiedInclude });
             }
             else {
-                // Find matching combinations to modify
-                let matchFound = false;
-                const includeKeys = Object.keys(stringifiedInclude);
-                // Try to add to existing combinations that match all specified keys
-                combinations.forEach(combination => {
-                    let isMatch = true;
-                    for (const key of includeKeys) {
-                        if (key in combination && combination[key] !== stringifiedInclude[key]) {
-                            isMatch = false;
-                            break;
-                        }
-                    }
-                    if (isMatch) {
-                        matchFound = true;
-                        // Add new properties without overwriting existing ones
-                        for (const [key, value] of Object.entries(stringifiedInclude)) {
-                            if (!(key in combination)) {
-                                combination[key] = value;
-                            }
-                        }
-                    }
-                });
-                // If no matches found, add as new combination
-                if (!matchFound) {
-                    combinations.push(stringifiedInclude);
-                }
+                // Replace existing combinations with enhanced ones
+                combinations.length = 0;
+                combinations.push(...newCombinations);
             }
         }
     }
