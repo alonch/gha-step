@@ -105,4 +105,21 @@ describe('collectStepOutputs', () => {
       os: 'mac'
     });
   });
+
+  it('should collect sequential values in order', () => {
+    const outputs = [
+      'tags=v1.0',
+      'tags=latest',
+      'tags=stable',
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable'],
+      arch: 'x64'
+    });
+    // Verify exact order
+    expect(result.tags).toEqual(['v1.0', 'latest', 'stable']);
+  });
 }); 

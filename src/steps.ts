@@ -22,10 +22,11 @@ export function collectStepOutputs(outputs: string[]): StepOutputs {
         if (!existing.includes(value)) {
           existing.push(value);
         }
-      } else {
-        // Convert to array with both values only if they're different
-        result[key] = existing === value ? existing : [existing, value];
+      } else if (existing !== value) {
+        // If it's a string and different from new value, convert to array
+        result[key] = [existing, value];
       }
+      // If it's the same value, keep it as is
     } else {
       // First occurrence of this key
       result[key] = value;
