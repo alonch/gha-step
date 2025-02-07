@@ -355,7 +355,7 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
 
     try {
       // Execute step
-      await exec.exec('bash', ['-c', step.run], { env });
+      await exec.exec('bash', ['-c', step.run], { env, silent: true });
 
       // Read step outputs
       try {

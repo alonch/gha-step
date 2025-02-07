@@ -25973,7 +25973,7 @@ async function executeSteps(steps, matrix) {
         });
         try {
             // Execute step
-            await exec.exec('bash', ['-c', step.run], { env });
+            await exec.exec('bash', ['-c', step.run], { env, silent: true });
             // Read step outputs
             try {
                 const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
