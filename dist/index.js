@@ -25685,6 +25685,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const exec = __importStar(__nccwpck_require__(5236));
 const yaml = __importStar(__nccwpck_require__(8815));
+const steps_1 = __nccwpck_require__(6992);
 function validateMatrixConfig(config) {
     if (!Array.isArray(config)) {
         throw new Error('Matrix configuration must be an array');
@@ -25881,7 +25882,7 @@ async function executeSteps(steps, matrix) {
         Object.entries(stepOutputs).forEach(([stepId, stepOutput]) => {
             Object.entries(stepOutput).forEach(([key, value]) => {
                 const envKey = `STEPS_${stepId.toUpperCase()}_${key.toUpperCase()}`;
-                env[envKey] = value;
+                env[envKey] = Array.isArray(value) ? value[value.length - 1] : value;
             });
         });
         try {
@@ -25893,14 +25894,8 @@ async function executeSteps(steps, matrix) {
                     const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: false });
                     return stdout;
                 });
-                // Parse outputs
-                const currentStepOutputs = outputContent.split('\n')
-                    .filter(line => line.includes('='))
-                    .reduce((acc, line) => {
-                    const [key, value] = line.split('=');
-                    acc[key.trim()] = value.trim();
-                    return acc;
-                }, {});
+                // Parse outputs using our new collectStepOutputs function
+                const currentStepOutputs = (0, steps_1.collectStepOutputs)(outputContent.split('\n'));
                 // Store outputs both globally and per step
                 Object.assign(outputs, currentStepOutputs);
                 stepOutputs[step.id] = currentStepOutputs;
@@ -25921,6 +25916,45 @@ async function executeSteps(steps, matrix) {
 run();
 run();
 run();
+
+
+/***/ }),
+
+/***/ 6992:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.collectStepOutputs = collectStepOutputs;
+function collectStepOutputs(outputs) {
+    // Use a Map to track all values for each key
+    const valueMap = new Map();
+    for (const line of outputs) {
+        // Skip malformed lines
+        const match = line.match(/^([^=]+)=(.*)$/);
+        if (!match)
+            continue;
+        const [, key, value] = match;
+        // Skip empty keys or empty values
+        if (!key.trim() || !value.trim())
+            continue;
+        // Get or create Set for this key
+        if (!valueMap.has(key)) {
+            valueMap.set(key, new Set());
+        }
+        valueMap.get(key).add(value);
+    }
+    // Convert to final output format
+    const result = {};
+    for (const [key, values] of valueMap.entries()) {
+        const valuesArray = Array.from(values);
+        // If we only have one value, return it as a string
+        // Otherwise return the array of values in insertion order
+        result[key] = valuesArray.length === 1 ? valuesArray[0] : valuesArray;
+    }
+    return result;
+}
 
 
 /***/ }),

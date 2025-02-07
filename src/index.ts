@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as yaml from 'yaml';
+import { collectStepOutputs } from './steps';
 
 interface StepDefinition {
   name: string;
@@ -17,7 +18,7 @@ interface MatrixInput {
 }
 
 interface StepOutputs {
-  [key: string]: string;
+  [key: string]: string | string[];
 }
 
 interface ProcessEnv {
@@ -245,7 +246,7 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
     Object.entries(stepOutputs).forEach(([stepId, stepOutput]) => {
       Object.entries(stepOutput).forEach(([key, value]) => {
         const envKey = `STEPS_${stepId.toUpperCase()}_${key.toUpperCase()}`;
-        env[envKey] = value;
+        env[envKey] = Array.isArray(value) ? value[value.length - 1] : value;
       });
     });
 
@@ -260,14 +261,8 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
           return stdout;
         });
 
-        // Parse outputs
-        const currentStepOutputs = outputContent.split('\n')
-          .filter(line => line.includes('='))
-          .reduce((acc: StepOutputs, line) => {
-            const [key, value] = line.split('=');
-            acc[key.trim()] = value.trim();
-            return acc;
-          }, {});
+        // Parse outputs using our new collectStepOutputs function
+        const currentStepOutputs = collectStepOutputs(outputContent.split('\n'));
 
         // Store outputs both globally and per step
         Object.assign(outputs, currentStepOutputs);
