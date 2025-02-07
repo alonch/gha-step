@@ -261,4 +261,77 @@ describe('generateMatrixCombinations', () => {
       { fruit: 'pear', animal: 'dog', color: 'green', combo: 'pear-dog-green' }
     ]);
   });
+
+  it('should handle array values in includes', () => {
+    const input = {
+      include: [
+        { fruit: 'apple', color: ['green', 'red', 'yellow'] }
+      ]
+    };
+
+    const result = generateMatrixCombinations(input);
+    expectSameContent(result, [
+      { fruit: 'apple', color: 'green' },
+      { fruit: 'apple', color: 'red' },
+      { fruit: 'apple', color: 'yellow' }
+    ]);
+  });
+
+  it('should handle multiple array values in includes', () => {
+    const input = {
+      include: [
+        { 
+          fruit: 'apple', 
+          color: ['green', 'red'],
+          size: ['small', 'large']
+        }
+      ]
+    };
+
+    const result = generateMatrixCombinations(input);
+    expectSameContent(result, [
+      { fruit: 'apple', color: 'green', size: 'small' },
+      { fruit: 'apple', color: 'green', size: 'large' },
+      { fruit: 'apple', color: 'red', size: 'small' },
+      { fruit: 'apple', color: 'red', size: 'large' }
+    ]);
+  });
+
+  it('should handle mix of array and scalar values in includes', () => {
+    const input = {
+      include: [
+        { 
+          fruit: 'apple',
+          color: ['green', 'red'],
+          shape: 'round',
+          size: ['small', 'large']
+        }
+      ]
+    };
+
+    const result = generateMatrixCombinations(input);
+    expectSameContent(result, [
+      { fruit: 'apple', color: 'green', shape: 'round', size: 'small' },
+      { fruit: 'apple', color: 'green', shape: 'round', size: 'large' },
+      { fruit: 'apple', color: 'red', shape: 'round', size: 'small' },
+      { fruit: 'apple', color: 'red', shape: 'round', size: 'large' }
+    ]);
+  });
+
+  it('should handle multiple includes with arrays', () => {
+    const input = {
+      include: [
+        { fruit: 'apple', color: ['green', 'red'] },
+        { fruit: 'banana', color: ['yellow', 'brown'] }
+      ]
+    };
+
+    const result = generateMatrixCombinations(input);
+    expectSameContent(result, [
+      { fruit: 'apple', color: 'green' },
+      { fruit: 'apple', color: 'red' },
+      { fruit: 'banana', color: 'yellow' },
+      { fruit: 'banana', color: 'brown' }
+    ]);
+  });
 }); 

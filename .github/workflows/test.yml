@@ -442,4 +442,46 @@ jobs:
             echo "Full output:"
             echo "$output" | jq .
             exit 1
+          fi
+
+      - name: Test Array Include
+        id: array-include-test
+        uses: ./
+        with:
+          matrix: |
+            - include:
+                - fruit: apple
+                  color: [green, red, yellow]
+                  shape: round
+                - fruit: banana
+                  color: [yellow, brown]
+          steps: |
+            - name: Echo Values
+              id: echo
+              run: |
+                echo "combo=$MATRIX_FRUIT-$MATRIX_COLOR" >> $STEPS_OUTPUTS
+          outputs: |
+            - combo: ${ STEPS_ECHO_COMBO }
+
+      - name: Validate Array Include Output
+        run: |
+          output='${{ steps.array-include-test.outputs.json }}'
+          expected='[
+            {"fruit":"apple","color":"green","shape":"round","combo":"apple-green"},
+            {"fruit":"apple","color":"red","shape":"round","combo":"apple-red"},
+            {"fruit":"apple","color":"yellow","shape":"round","combo":"apple-yellow"},
+            {"fruit":"banana","color":"yellow","combo":"banana-yellow"},
+            {"fruit":"banana","color":"brown","combo":"banana-brown"}
+          ]'
+          
+          # Compare the outputs
+          if [ "$(echo "$output" | jq -S .)" != "$(echo "$expected" | jq -S .)" ]; then
+            echo "Array include test failed. Showing both versions:"
+            echo "Expected:"
+            echo "$expected" | jq .
+            echo "Got:"
+            echo "$output" | jq .
+            echo "Showing diff:"
+            diff -u <(echo "$expected" | jq .) <(echo "$output" | jq .) || true
+            exit 1
           fi 
