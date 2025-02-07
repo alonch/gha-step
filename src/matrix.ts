@@ -6,9 +6,29 @@ interface MatrixInclude {
   [key: string]: any;
 }
 
-type MatrixInput = {
+interface MatrixConfig {
   [key: string]: any[] | MatrixInclude[] | MatrixInclude | string;
-};
+}
+
+type MatrixInput = MatrixConfig | string;  // Allow string input for YAML
+
+import { parse as parseYaml } from 'yaml';
+
+function parseMatrixInput(input: MatrixInput): MatrixConfig {
+  if (typeof input === 'string') {
+    try {
+      const parsed = parseYaml(input);
+      // If the input is a YAML array, wrap it in an include
+      if (Array.isArray(parsed)) {
+        return { include: parsed };
+      }
+      return parsed as MatrixConfig;
+    } catch (error) {
+      throw new Error(`Failed to parse matrix YAML: ${error}`);
+    }
+  }
+  return input;
+}
 
 function expandMatrix(matrix: Record<string, any[]>): MatrixCombination[] {
   const keys = Object.keys(matrix);
@@ -159,7 +179,7 @@ function isStandaloneInclude(include: MatrixInclude, baseCombinations: MatrixCom
 
 export function generateMatrixCombinations(input: MatrixInput): MatrixCombination[] {
   // Extract matrix and include from input
-  const { include, ...matrixInput } = input;
+  const { include, ...matrixInput } = parseMatrixInput(input);
   const matrixKeys = Object.keys(matrixInput);
   const hasMatrix = matrixKeys.length > 0;
 

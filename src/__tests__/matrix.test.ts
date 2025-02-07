@@ -537,5 +537,212 @@ describe('generateMatrixCombinations', () => {
         { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
       ]);
     });
+
+    it('should handle workflow array include case', () => {
+      const input = {
+        include: [
+          {
+            fruit: 'apple',
+            color: ['green', 'red', 'yellow'],
+            shape: 'round'
+          },
+          {
+            fruit: 'banana',
+            color: ['yellow', 'brown']
+          }
+        ]
+      };
+
+      // Add combo field for testing
+      const result = generateMatrixCombinations(input).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      expectSameContent(result, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+
+      // Also verify that no items have comma-separated color values
+      for (const item of result) {
+        expect(item.color).not.toContain(',');
+      }
+    });
+
+    it('should handle workflow array include case with comma strings', () => {
+      const input = {
+        include: [
+          {
+            fruit: 'apple',
+            color: 'green,red,yellow',
+            shape: 'round'
+          },
+          {
+            fruit: 'banana',
+            color: 'yellow,brown'
+          }
+        ]
+      };
+
+      // Add combo field for testing
+      const result = generateMatrixCombinations(input).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      expectSameContent(result, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+
+      // Also verify that no items have comma-separated color values
+      for (const item of result) {
+        expect(item.color).not.toContain(',');
+      }
+    });
+
+    it('should handle exact workflow input format', () => {
+      const input = {
+        matrix: {
+          include: [
+            {
+              fruit: 'apple',
+              color: ['green', 'red', 'yellow'],
+              shape: 'round'
+            },
+            {
+              fruit: 'banana',
+              color: ['yellow', 'brown']
+            }
+          ]
+        }
+      };
+
+      // Add combo field for testing
+      const result = generateMatrixCombinations(input.matrix).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      expectSameContent(result, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+
+      // Also verify that no items have comma-separated color values
+      for (const item of result) {
+        expect(item.color).not.toContain(',');
+      }
+    });
+
+    it('should handle exact workflow YAML string format', () => {
+      const yamlInput = `
+        - fruit: apple
+          color: [green, red, yellow]
+          shape: round
+        - fruit: banana
+          color: [yellow, brown]
+      `;
+
+      const input = {
+        include: [
+          {
+            fruit: 'apple',
+            color: ['green', 'red', 'yellow'],
+            shape: 'round'
+          },
+          {
+            fruit: 'banana',
+            color: ['yellow', 'brown']
+          }
+        ]
+      };
+
+      // Add combo field for testing
+      const result = generateMatrixCombinations(input).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      expectSameContent(result, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+
+      // Also verify that no items have comma-separated color values
+      for (const item of result) {
+        expect(item.color).not.toContain(',');
+      }
+
+      // Test YAML string input
+      const yamlResult = generateMatrixCombinations(yamlInput).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+      expectSameContent(yamlResult, result);
+    });
+
+    it('should handle exact workflow YAML string format with comma strings', () => {
+      const yamlInput = `
+        - fruit: apple
+          color: green,red,yellow
+          shape: round
+        - fruit: banana
+          color: yellow,brown
+      `;
+
+      const input = {
+        include: [
+          {
+            fruit: 'apple',
+            color: 'green,red,yellow',
+            shape: 'round'
+          },
+          {
+            fruit: 'banana',
+            color: 'yellow,brown'
+          }
+        ]
+      };
+
+      // Add combo field for testing
+      const result = generateMatrixCombinations(input).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      expectSameContent(result, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+
+      // Also verify that no items have comma-separated color values
+      for (const item of result) {
+        expect(item.color).not.toContain(',');
+      }
+
+      // Test YAML string input
+      const yamlResult = generateMatrixCombinations(yamlInput).map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+      expectSameContent(yamlResult, result);
+    });
   });
 }); 
