@@ -122,4 +122,92 @@ describe('collectStepOutputs', () => {
     // Verify exact order
     expect(result.tags).toEqual(['v1.0', 'latest', 'stable']);
   });
+
+  it('should handle CSV format for array values', () => {
+    const outputs = [
+      'tags=v1.0,latest,stable',
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable'],
+      arch: 'x64'
+    });
+    // Verify exact order
+    expect(result.tags).toEqual(['v1.0', 'latest', 'stable']);
+  });
+
+  it('should handle repeated values for arrays', () => {
+    const outputs = [
+      'tags=v1.0',
+      'tags=latest',
+      'tags=stable',
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable'],
+      arch: 'x64'
+    });
+    // Verify exact order
+    expect(result.tags).toEqual(['v1.0', 'latest', 'stable']);
+  });
+
+  it('should handle mixed CSV and repeated values', () => {
+    const outputs = [
+      'tags=v1.0,latest',  // CSV format
+      'tags=stable',       // Single value
+      'tags=beta,alpha',   // Another CSV
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable', 'beta', 'alpha'],
+      arch: 'x64'
+    });
+  });
+
+  it('should handle empty values in CSV', () => {
+    const outputs = [
+      'tags=v1.0,,latest,,stable',  // Empty values in CSV
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable'],
+      arch: 'x64'
+    });
+  });
+
+  it('should handle whitespace in CSV values', () => {
+    const outputs = [
+      'tags= v1.0 , latest , stable ',  // Whitespace around values
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable'],
+      arch: 'x64'
+    });
+  });
+
+  it('should deduplicate values from mixed formats', () => {
+    const outputs = [
+      'tags=v1.0,latest',     // CSV format
+      'tags=stable,v1.0',     // Duplicate in CSV
+      'tags=latest',          // Duplicate as single value
+      'arch=x64'
+    ];
+    
+    const result = collectStepOutputs(outputs);
+    expect(result).toEqual({
+      tags: ['v1.0', 'latest', 'stable'],
+      arch: 'x64'
+    });
+  });
 }); 

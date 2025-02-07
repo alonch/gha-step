@@ -1,37 +1,58 @@
 interface MatrixCombination {
-  [key: string]: string;
+  [key: string]: any;
 }
 
 interface MatrixInclude {
-  [key: string]: string | string[] | number | number[];
+  [key: string]: any;
+}
+
+type MatrixInput = {
+  [key: string]: any[] | MatrixInclude[] | MatrixInclude | string;
+};
+
+function expandMatrix(matrix: Record<string, any[]>): MatrixCombination[] {
+  const keys = Object.keys(matrix);
+  if (keys.length === 0) return [];
+
+  return keys.reduce<MatrixCombination[]>((acc, key) => {
+    const values = matrix[key];
+    if (acc.length === 0) {
+      return values.map(value => ({ [key]: value }));
+    }
+    return acc.flatMap(combo => 
+      values.map(value => ({ ...combo, [key]: value }))
+    );
+  }, []);
 }
 
 function expandInclude(include: MatrixInclude): MatrixCombination[] {
+  const entries = Object.entries(include);
+  const arrayEntries = entries.filter(([_, value]) => Array.isArray(value) || (typeof value === 'string' && value.includes(',')));
+  const scalarEntries = entries.filter(([_, value]) => !Array.isArray(value) && !(typeof value === 'string' && value.includes(',')));
+
   // Convert any comma-separated strings to arrays
-  const processedInclude = Object.fromEntries(
-    Object.entries(include).map(([key, value]) => {
-      if (typeof value === 'string' && value.includes(',')) {
-        return [key, value.split(',').map(v => v.trim())];
-      }
-      return [key, value];
-    })
-  );
+  const processedArrayEntries = arrayEntries.map(([key, value]) => {
+    if (typeof value === 'string') {
+      return [key, value.split(',').map(v => v.trim()).filter(Boolean)];
+    }
+    return [key, value];
+  });
 
-  // Find all array values and their keys
-  const arrayEntries = Object.entries(processedInclude).filter(([_, value]) => Array.isArray(value));
-  const scalarEntries = Object.entries(processedInclude).filter(([_, value]) => !Array.isArray(value));
-
-  // If no arrays, return a single combination with all values as strings
-  if (arrayEntries.length === 0) {
-    return [{
-      ...Object.fromEntries(scalarEntries.map(([key, value]) => [key, String(value)]))
-    }];
+  // Start with scalar values
+  let result: MatrixCombination = {};
+  for (const [key, value] of scalarEntries) {
+    result[key] = value;
   }
 
-  // Generate cartesian product of all array values
-  const arrayKeys = arrayEntries.map(([key]) => key);
-  const arrayValues = arrayEntries.map(([_, value]) => value as (string | number)[]);
-  
+  // If no array values, return single combination
+  if (processedArrayEntries.length === 0) {
+    return [result];
+  }
+
+  // Expand array values using cartesian product
+  const arrayKeys = processedArrayEntries.map(([key]) => key);
+  const arrayValues = processedArrayEntries.map(([_, values]) => values as any[]);
+
   const cartesian = (...arrays: any[][]): any[][] => {
     return arrays.reduce((acc: any[][], curr: any[]) =>
       acc.flatMap((combo: any[]) => curr.map((item: any) => [...combo, item])),
@@ -40,147 +61,231 @@ function expandInclude(include: MatrixInclude): MatrixCombination[] {
   };
 
   const combinations = cartesian(...arrayValues);
-
-  // Create a combination for each cartesian product result
   return combinations.map(combo => {
-    const result: MatrixCombination = {};
-    
-    // Add scalar values
-    scalarEntries.forEach(([key, value]) => {
-      result[key] = String(value);
-    });
-    
-    // Add array values
+    const expanded = { ...result };
     arrayKeys.forEach((key, index) => {
-      result[key] = String(combo[index]);
+      expanded[key] = combo[index];
     });
-    
-    return result;
+    return expanded;
   });
 }
 
-export function generateMatrixCombinations(matrixConfig: { [key: string]: any }): MatrixCombination[] {
-  // Handle includes without matrix
-  if (Object.keys(matrixConfig).length === 1 && matrixConfig.include) {
-    const includes = typeof matrixConfig.include === 'string' 
-      ? JSON.parse(matrixConfig.include)
-      : matrixConfig.include;
-    
-    // Expand each include that has arrays
-    return (includes as MatrixInclude[]).flatMap(include => expandInclude(include));
+function matchesInclude(base: MatrixCombination, include: MatrixInclude): { matches: boolean; score: number } {
+  let matchCount = 0;
+  let totalMatchableKeys = 0;
+
+  for (const [key, value] of Object.entries(include)) {
+    if (key === 'if') continue;
+    if (base[key] !== undefined) {
+      totalMatchableKeys++;
+      if (Array.isArray(value) || (typeof value === 'string' && value.includes(','))) {
+        // For array values, check if base value is in the array
+        const values = Array.isArray(value) ? value : value.split(',').map(v => v.trim()).filter(Boolean);
+        if (values.includes(base[key])) {
+          matchCount++;
+        }
+      } else if (base[key] === value) {
+        matchCount++;
+      }
+    }
   }
 
-  // Extract matrix keys and includes
-  const { include, ...matrix } = matrixConfig;
-  const keys = Object.keys(matrix);
+  return {
+    matches: matchCount > 0,
+    score: totalMatchableKeys > 0 ? matchCount / totalMatchableKeys : 0
+  };
+}
 
-  // If no matrix keys, return empty array
-  if (keys.length === 0) return [];
-
-  // Generate base combinations
-  const combinations = keys.reduce<MatrixCombination[]>((acc, key) => {
-    const values = matrix[key];
-    if (acc.length === 0) {
-      return values.map((value: any) => ({ [key]: String(value) }));
+function isStandaloneInclude(include: MatrixInclude, baseCombinations: MatrixCombination[], matrixKeys: string[]): boolean {
+  const includeKeys = Object.keys(include).filter(key => key !== 'if');
+  
+  // If the include has a key that's in the base matrix but with a different value,
+  // and no other keys from the base matrix, it's standalone
+  const matrixKeysInInclude = includeKeys.filter(key => matrixKeys.includes(key));
+  if (matrixKeysInInclude.length === 1) {
+    const key = matrixKeysInInclude[0];
+    const value = include[key];
+    if (Array.isArray(value) || (typeof value === 'string' && value.includes(','))) {
+      // For array values, check if any value is not in the base matrix
+      const values = Array.isArray(value) ? value : value.split(',').map(v => v.trim()).filter(Boolean);
+      const baseValues = new Set(baseCombinations.map(combo => combo[key]));
+      if (values.some(v => !baseValues.has(v))) {
+        return true;
+      }
+    } else {
+      const baseValues = new Set(baseCombinations.map(combo => combo[key]));
+      if (!baseValues.has(value)) {
+        return true;
+      }
     }
-    return acc.flatMap(combo => 
-      values.map((value: any) => ({ ...combo, [key]: String(value) }))
-    );
-  }, []);
+  }
 
-  // If no includes, return base combinations
-  if (!include) return combinations;
+  // If the include has no keys that overlap with any base combination,
+  // and it's not a simple default value (single key), then it's standalone
+  if (includeKeys.length === 1 && !matrixKeys.includes(includeKeys[0])) {
+    return false; // Single non-matrix key includes are treated as defaults
+  }
 
-  // Parse includes if it's a string
-  const includes = typeof include === 'string' ? JSON.parse(include) : include;
+  for (const base of baseCombinations) {
+    let hasMatchingKey = false;
+    let hasConflict = false;
 
-  // Process each include
-  const result: MatrixCombination[] = [...combinations];
-  const standaloneIncludes: MatrixCombination[] = [];
-
-  for (const inc of includes as MatrixInclude[]) {
-    // Expand the include if it has arrays
-    const expandedIncludes = expandInclude(inc);
-
-    for (const expandedInc of expandedIncludes) {
-      let canBeAdded = false;
-
-      // Check if this include would overwrite any original matrix values
-      const wouldOverwrite = (combo: MatrixCombination) => {
-        for (const key of Object.keys(expandedInc)) {
-          if (key in matrix && combo[key] !== expandedInc[key]) {
-            return true;
-          }
-        }
-        return false;
-      };
-
-      // Try to add this include to existing combinations
-      for (const combo of combinations) {
-        // Check if this include matches the combination's conditions
-        let matches = true;
-        for (const [key, value] of Object.entries(expandedInc)) {
-          if (key in matrix && combo[key] !== value) {
-            matches = false;
+    for (const [key, value] of Object.entries(include)) {
+      if (key === 'if') continue;
+      if (base[key] !== undefined) {
+        hasMatchingKey = true;
+        if (Array.isArray(value) || (typeof value === 'string' && value.includes(','))) {
+          // For array values, check if any value matches
+          const values = Array.isArray(value) ? value : value.split(',').map(v => v.trim()).filter(Boolean);
+          if (!values.includes(base[key])) {
+            hasConflict = true;
             break;
           }
+        } else if (base[key] !== value) {
+          hasConflict = true;
+          break;
         }
+      }
+    }
 
-        // If it matches and doesn't overwrite matrix values, apply it
-        if (matches && !wouldOverwrite(combo)) {
-          const index = result.findIndex(r => 
-            Object.entries(combo).every(([k, v]) => r[k] === v)
-          );
-          if (index !== -1) {
-            result[index] = { ...result[index], ...expandedInc };
-            canBeAdded = true;
+    // If we have matching keys and no conflicts, this is not a standalone include
+    if (hasMatchingKey && !hasConflict) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function generateMatrixCombinations(input: MatrixInput): MatrixCombination[] {
+  // Extract matrix and include from input
+  const { include, ...matrixInput } = input;
+  const matrixKeys = Object.keys(matrixInput);
+  const hasMatrix = matrixKeys.length > 0;
+
+  // Parse includes
+  const includes = include ? (
+    typeof include === 'string' ? JSON.parse(include) as MatrixInclude[] :
+    Array.isArray(include) ? include : [include]
+  ) : [];
+
+  // Handle includes without matrix
+  if (!hasMatrix) {
+    return includes.flatMap(inc => expandInclude(inc));
+  }
+
+  // Generate base combinations from matrix
+  const matrix = Object.fromEntries(
+    Object.entries(matrixInput).map(([key, value]) => [key, Array.isArray(value) ? value : [value]])
+  ) as Record<string, any[]>;
+  
+  const baseCombinations = expandMatrix(matrix);
+  const result: MatrixCombination[] = [];
+  const processedCombinations = new Set<string>();
+
+  // First, identify standalone includes and default values
+  const standaloneIncludes = includes.filter(inc => isStandaloneInclude(inc, baseCombinations, matrixKeys));
+  const defaultIncludes = includes.filter(inc => {
+    const keys = Object.keys(inc).filter(key => key !== 'if');
+    return keys.length === 1 && !matrixKeys.includes(keys[0]) && !isStandaloneInclude(inc, baseCombinations, matrixKeys);
+  });
+  const matchingIncludes = includes.filter(inc => 
+    !isStandaloneInclude(inc, baseCombinations, matrixKeys) && 
+    !(Object.keys(inc).filter(key => key !== 'if').length === 1 && !matrixKeys.includes(Object.keys(inc).filter(key => key !== 'if')[0]))
+  );
+
+  // Process base combinations
+  for (const base of baseCombinations) {
+    let current = { ...base };
+    
+    // First apply default includes
+    for (const inc of defaultIncludes) {
+      const expanded = expandInclude(inc);
+      for (const exp of expanded) {
+        for (const [key, value] of Object.entries(exp)) {
+          if (current[key] === undefined) {
+            current[key] = value;
           }
         }
       }
+    }
 
-      // If this include couldn't be added to any combination, it becomes standalone
-      if (!canBeAdded) {
-        standaloneIncludes.push(expandedInc);
+    // Then find all includes that match this combination
+    const matchingIncludesForBase = matchingIncludes
+      .map(inc => {
+        const { matches, score } = matchesInclude(base, inc);
+        return { include: inc, matches, score };
+      })
+      .filter(({ matches }) => matches)
+      .sort((a, b) => b.score - a.score); // Sort by match score descending
+
+    if (matchingIncludesForBase.length > 0) {
+      // Start with current (base + defaults)
+      let combinations: MatrixCombination[] = [current];
+      
+      // Apply each matching include in order of specificity
+      for (const { include } of matchingIncludesForBase) {
+        const expanded = expandInclude(include);
+        const newCombinations: MatrixCombination[] = [];
+
+        // For each existing combination
+        for (const combination of combinations) {
+          // Find all expanded values that match our base combination
+          const matchingExpanded = expanded.filter(exp => {
+            for (const [key, value] of Object.entries(exp)) {
+              // Skip checking keys that aren't in the base combination
+              if (base[key] === undefined) continue;
+              // For matching keys, values must match exactly
+              if (base[key] !== value) {
+                return false;
+              }
+            }
+            return true;
+          });
+
+          if (matchingExpanded.length > 0) {
+            // Create a new combination for each matching expanded value
+            for (const exp of matchingExpanded) {
+              newCombinations.push({ ...combination, ...exp });
+            }
+          } else {
+            // Keep the original combination if no matches
+            newCombinations.push(combination);
+          }
+        }
+
+        combinations = newCombinations;
+      }
+
+      // Add each unique combination
+      for (const combination of combinations) {
+        const combinationStr = JSON.stringify(combination);
+        if (!processedCombinations.has(combinationStr)) {
+          result.push(combination);
+          processedCombinations.add(combinationStr);
+        }
+      }
+    } else {
+      // No matching includes, add the current combination with default includes
+      const combinationStr = JSON.stringify(current);
+      if (!processedCombinations.has(combinationStr)) {
+        result.push(current);
+        processedCombinations.add(combinationStr);
       }
     }
   }
 
-  // For test compatibility, sort the results in a stable way
-  const allResults = [...result, ...standaloneIncludes];
-  return allResults.sort((a, b) => {
-    // Matrix combinations come before standalone includes
-    const aIsMatrix = result.includes(a);
-    const bIsMatrix = result.includes(b);
-    if (aIsMatrix !== bIsMatrix) {
-      return aIsMatrix ? -1 : 1;
-    }
-
-    // Then sort by fruit
-    if (a.fruit !== b.fruit) {
-      // Special case: banana comes before other standalone fruits
-      if (!aIsMatrix && !bIsMatrix) {
-        if (a.fruit === 'banana' && b.fruit !== 'banana') return -1;
-        if (b.fruit === 'banana' && a.fruit !== 'banana') return 1;
-      }
-      return String(a.fruit || '').localeCompare(String(b.fruit || ''));
-    }
-
-    // Then by number of properties for standalone includes
-    if (!aIsMatrix && !bIsMatrix) {
-      const aKeys = Object.keys(a).length;
-      const bKeys = Object.keys(b).length;
-      if (aKeys !== bKeys) return aKeys - bKeys;
-    }
-
-    // Then by other fields for stable sorting
-    const fields = ['animal', 'color', 'shape'];
-    for (const field of fields) {
-      if (a[field] !== b[field]) {
-        if (!a[field]) return 1;
-        if (!b[field]) return -1;
-        return String(a[field]).localeCompare(String(b[field]));
+  // Add standalone includes
+  for (const inc of standaloneIncludes) {
+    const expanded = expandInclude(inc);
+    for (const combination of expanded) {
+      const combinationStr = JSON.stringify(combination);
+      if (!processedCombinations.has(combinationStr)) {
+        result.push(combination);
+        processedCombinations.add(combinationStr);
       }
     }
-    return 0;
-  });
+  }
+
+  return result;
 } 
