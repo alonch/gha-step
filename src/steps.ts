@@ -3,7 +3,8 @@ interface StepOutputs {
 }
 
 export function collectStepOutputs(outputs: string[]): StepOutputs {
-  const result: StepOutputs = {};
+  // Use a Map to track all values for each key
+  const valueMap = new Map<string, Set<string>>();
 
   for (const line of outputs) {
     // Skip malformed lines
@@ -14,23 +15,20 @@ export function collectStepOutputs(outputs: string[]): StepOutputs {
     // Skip empty keys or empty values
     if (!key.trim() || !value.trim()) continue;
 
-    if (key in result) {
-      // If we already have this key
-      const existing = result[key];
-      if (Array.isArray(existing)) {
-        // If it's already an array, append to it only if not already present
-        if (!existing.includes(value)) {
-          existing.push(value);
-        }
-      } else if (existing !== value) {
-        // If it's a string and different from new value, convert to array
-        result[key] = [existing, value];
-      }
-      // If it's the same value, keep it as is
-    } else {
-      // First occurrence of this key
-      result[key] = value;
+    // Get or create Set for this key
+    if (!valueMap.has(key)) {
+      valueMap.set(key, new Set());
     }
+    valueMap.get(key)!.add(value);
+  }
+
+  // Convert to final output format
+  const result: StepOutputs = {};
+  for (const [key, values] of valueMap.entries()) {
+    const valuesArray = Array.from(values);
+    // If we only have one value, return it as a string
+    // Otherwise return the array of values in insertion order
+    result[key] = valuesArray.length === 1 ? valuesArray[0] : valuesArray;
   }
 
   return result;
