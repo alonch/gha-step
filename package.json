@@ -10,7 +10,12 @@
     "all": "npm run build && npm run package",
     "prepare": "npm run build && npm run package"
   },
-  "keywords": ["github", "actions", "matrix", "steps"],
+  "keywords": [
+    "github",
+    "actions",
+    "matrix",
+    "steps"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -20,8 +25,11 @@
     "yaml": "^2.7.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.1",
     "@vercel/ncc": "^0.38.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.7.3"
   }
 }
