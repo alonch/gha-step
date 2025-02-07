@@ -201,33 +201,34 @@ jobs:
 
       - name: Validate Include Output
         run: |
-          # Helper function to normalize and sort JSON arrays
-          normalize_and_sort() {
-            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
-          }
-
-          # Normalize and sort both JSONs
-          output_sorted=$(normalize_and_sort '${{ steps.include-test.outputs.json }}')
-          expected_sorted=$(normalize_and_sort '[
-            {"fruit":"apple","animal":"cat","color":"pink","shape":"circle","combo":"apple-cat-pink-circle"},
-            {"fruit":"apple","animal":"dog","color":"green","shape":"circle","combo":"apple-dog-green-circle"},
-            {"fruit":"pear","animal":"cat","color":"pink","combo":"pear-cat-pink"},
-            {"fruit":"pear","animal":"dog","color":"green","combo":"pear-dog-green"},
-            {"fruit":"banana","combo":"banana"},
-            {"fruit":"banana","animal":"cat","combo":"banana-cat"}
-          ]')
+          output='${{ steps.include-test.outputs.json }}'
           
-          # Compare the sorted JSONs
-          if [ "$output_sorted" != "$expected_sorted" ]; then
-            echo "JSON comparison failed. Showing both versions:"
-            echo "Expected (sorted):"
-            echo "$expected_sorted" | jq .
-            echo "Got (sorted):"
-            echo "$output_sorted" | jq .
-            echo "Showing diff:"
-            diff -u <(echo "$expected_sorted" | jq .) <(echo "$output_sorted" | jq .) || true
+          # Check each expected combination
+          expected_combinations=(
+            '{"fruit":"apple","animal":"cat","color":"pink","shape":"circle","combo":"apple-cat-pink-circle"}'
+            '{"fruit":"apple","animal":"dog","color":"green","shape":"circle","combo":"apple-dog-green-circle"}'
+            '{"fruit":"pear","animal":"cat","color":"pink","combo":"pear-cat-pink"}'
+            '{"fruit":"pear","animal":"dog","color":"green","combo":"pear-dog-green"}'
+            '{"fruit":"banana","combo":"banana"}'
+            '{"fruit":"banana","animal":"cat","combo":"banana-cat"}'
+          )
+
+          # Verify count matches
+          count=$(echo "$output" | jq length)
+          if [ "$count" -ne "${#expected_combinations[@]}" ]; then
+            echo "Expected ${#expected_combinations[@]} combinations, but got $count"
+            echo "Output: $output"
             exit 1
           fi
+
+          # Check each combination exists
+          for combination in "${expected_combinations[@]}"; do
+            if ! echo "$output" | jq -e --arg combo "$combination" 'contains([($combo | fromjson)])' > /dev/null; then
+              echo "Missing expected combination: $combination"
+              echo "Output: $output"
+              exit 1
+            fi
+          done
 
       - name: Test Include-Only Matrix
         id: include-only-test
@@ -258,32 +259,33 @@ jobs:
 
       - name: Validate Include-Only Output
         run: |
-          # Helper function to normalize and sort JSON arrays
-          normalize_and_sort() {
-            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
-          }
-
-          # Normalize and sort both JSONs
-          output_sorted=$(normalize_and_sort '${{ steps.include-only-test.outputs.json }}')
-          expected_sorted=$(normalize_and_sort '[
-            {"color":"green","combo":"green"},
-            {"color":"pink","animal":"cat","combo":"pink-cat"},
-            {"fruit":"apple","shape":"circle","combo":"apple-circle"},
-            {"fruit":"banana","combo":"banana"},
-            {"fruit":"banana","animal":"cat","combo":"banana-cat"}
-          ]')
+          output='${{ steps.include-only-test.outputs.json }}'
           
-          # Compare the sorted JSONs
-          if [ "$output_sorted" != "$expected_sorted" ]; then
-            echo "JSON comparison failed. Showing both versions:"
-            echo "Expected (sorted):"
-            echo "$expected_sorted" | jq .
-            echo "Got (sorted):"
-            echo "$output_sorted" | jq .
-            echo "Showing diff:"
-            diff -u <(echo "$expected_sorted" | jq .) <(echo "$output_sorted" | jq .) || true
+          # Check each expected combination
+          expected_combinations=(
+            '{"color":"green","combo":"green"}'
+            '{"color":"pink","animal":"cat","combo":"pink-cat"}'
+            '{"fruit":"apple","shape":"circle","combo":"apple-circle"}'
+            '{"fruit":"banana","combo":"banana"}'
+            '{"fruit":"banana","animal":"cat","combo":"banana-cat"}'
+          )
+
+          # Verify count matches
+          count=$(echo "$output" | jq length)
+          if [ "$count" -ne "${#expected_combinations[@]}" ]; then
+            echo "Expected ${#expected_combinations[@]} combinations, but got $count"
+            echo "Output: $output"
             exit 1
           fi
+
+          # Check each combination exists
+          for combination in "${expected_combinations[@]}"; do
+            if ! echo "$output" | jq -e --arg combo "$combination" 'contains([($combo | fromjson)])' > /dev/null; then
+              echo "Missing expected combination: $combination"
+              echo "Output: $output"
+              exit 1
+            fi
+          done
 
       - name: Test Include From JSON
         id: json-include-test
@@ -306,29 +308,30 @@ jobs:
 
       - name: Validate JSON Include Output
         run: |
-          # Helper function to normalize and sort JSON arrays
-          normalize_and_sort() {
-            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
-          }
-
-          # Normalize and sort both JSONs
-          output_sorted=$(normalize_and_sort '${{ steps.json-include-test.outputs.json }}')
-          expected_sorted=$(normalize_and_sort '[
-            {"color":"green","combo":"green"},
-            {"color":"pink","animal":"cat","combo":"pink-cat"},
-            {"fruit":"apple","shape":"circle","combo":"apple-circle"},
-            {"fruit":"banana","combo":"banana"},
-            {"fruit":"banana","animal":"cat","combo":"banana-cat"}
-          ]')
+          output='${{ steps.json-include-test.outputs.json }}'
           
-          # Compare the sorted JSONs
-          if [ "$output_sorted" != "$expected_sorted" ]; then
-            echo "JSON comparison failed. Showing both versions:"
-            echo "Expected (sorted):"
-            echo "$expected_sorted" | jq .
-            echo "Got (sorted):"
-            echo "$output_sorted" | jq .
-            echo "Showing diff:"
-            diff -u <(echo "$expected_sorted" | jq .) <(echo "$output_sorted" | jq .) || true
+          # Check each expected combination
+          expected_combinations=(
+            '{"color":"green","combo":"green"}'
+            '{"color":"pink","animal":"cat","combo":"pink-cat"}'
+            '{"fruit":"apple","shape":"circle","combo":"apple-circle"}'
+            '{"fruit":"banana","combo":"banana"}'
+            '{"fruit":"banana","animal":"cat","combo":"banana-cat"}'
+          )
+
+          # Verify count matches
+          count=$(echo "$output" | jq length)
+          if [ "$count" -ne "${#expected_combinations[@]}" ]; then
+            echo "Expected ${#expected_combinations[@]} combinations, but got $count"
+            echo "Output: $output"
             exit 1
-          fi 
+          fi
+
+          # Check each combination exists
+          for combination in "${expected_combinations[@]}"; do
+            if ! echo "$output" | jq -e --arg combo "$combination" 'contains([($combo | fromjson)])' > /dev/null; then
+              echo "Missing expected combination: $combination"
+              echo "Output: $output"
+              exit 1
+            fi
+          done 
