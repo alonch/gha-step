@@ -175,52 +175,145 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
 
     // Process each include entry in order
     for (const include of includes) {
-      const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
-        acc[key] = String(value);
-        return acc;
-      }, {} as MatrixCombination);
+      // First, expand any array values in the include
+      const arrayEntries = Object.entries(include).filter(([_, value]) => 
+        Array.isArray(value) || (typeof value === 'string' && value.includes(','))
+      );
+      const scalarEntries = Object.entries(include).filter(([_, value]) => 
+        !Array.isArray(value) && !(typeof value === 'string' && value.includes(','))
+      );
 
-      // If there are no combinations yet, just add the include
-      if (combinations.length === 0) {
-        combinations.push({ ...stringifiedInclude });
+      // Convert any comma-separated strings to arrays
+      const processedArrayEntries = arrayEntries.map(([key, value]) => {
+        if (typeof value === 'string') {
+          return [key, value.split(',').map(v => v.trim()).filter(Boolean)];
+        }
+        return [key, value];
+      });
+
+      // Start with scalar values
+      const baseInclude = Object.fromEntries(scalarEntries);
+
+      // If no array values, just process as a single include
+      if (processedArrayEntries.length === 0) {
+        const stringifiedInclude = Object.entries(baseInclude).reduce((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {} as MatrixCombination);
+
+        // If there are no combinations yet, just add the include
+        if (combinations.length === 0) {
+          combinations.push({ ...stringifiedInclude });
+          continue;
+        }
+
+        // Check if this include matches any existing combinations
+        let matchFound = false;
+        const newCombinations: MatrixCombination[] = [];
+
+        for (const combination of combinations) {
+          let isMatch = true;
+          // Check if all shared keys match
+          for (const [key, value] of Object.entries(stringifiedInclude)) {
+            if (key in combination && combination[key] !== value) {
+              isMatch = false;
+              break;
+            }
+          }
+
+          if (isMatch) {
+            matchFound = true;
+            // Create a new combination with the include values
+            const newCombination = { ...combination };
+            for (const [key, value] of Object.entries(stringifiedInclude)) {
+              if (!(key in newCombination)) {
+                newCombination[key] = value;
+              }
+            }
+            newCombinations.push(newCombination);
+          } else {
+            newCombinations.push(combination);
+          }
+        }
+
+        // If no matches found, add as new combination
+        if (!matchFound) {
+          newCombinations.push({ ...stringifiedInclude });
+        }
+
+        combinations = newCombinations;
         continue;
       }
 
-      // Check if this include matches any existing combinations
-      let matchFound = false;
-      const newCombinations: MatrixCombination[] = [];
+      // Generate all combinations of array values
+      const arrayKeys = processedArrayEntries.map(([key]) => key);
+      const arrayValues = processedArrayEntries.map(([_, values]) => values as any[]);
 
-      for (const combination of combinations) {
-        let isMatch = true;
-        // Check if all shared keys match
-        for (const [key, value] of Object.entries(stringifiedInclude)) {
-          if (key in combination && combination[key] !== value) {
-            isMatch = false;
-            break;
-          }
+      const cartesian = (...arrays: any[][]): any[][] => {
+        return arrays.reduce((acc: any[][], curr: any[]) =>
+          acc.flatMap((combo: any[]) => curr.map((item: any) => [...combo, item])),
+          [[]]
+        );
+      };
+
+      const arrayCombinations = cartesian(...arrayValues);
+      const expandedIncludes = arrayCombinations.map(combo => {
+        const result = { ...baseInclude };
+        arrayKeys.forEach((key, index) => {
+          result[key as keyof typeof result] = String(combo[index]);
+        });
+        return result;
+      });
+
+      // Process each expanded include
+      for (const expandedInclude of expandedIncludes) {
+        const stringifiedInclude = Object.entries(expandedInclude).reduce((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {} as MatrixCombination);
+
+        // If there are no combinations yet, just add the include
+        if (combinations.length === 0) {
+          combinations.push({ ...stringifiedInclude });
+          continue;
         }
 
-        if (isMatch) {
-          matchFound = true;
-          // Create a new combination with the include values
-          const newCombination = { ...combination };
+        // Check if this include matches any existing combinations
+        let matchFound = false;
+        const newCombinations: MatrixCombination[] = [];
+
+        for (const combination of combinations) {
+          let isMatch = true;
+          // Check if all shared keys match
           for (const [key, value] of Object.entries(stringifiedInclude)) {
-            if (!(key in newCombination)) {
-              newCombination[key] = value;
+            if (key in combination && combination[key] !== value) {
+              isMatch = false;
+              break;
             }
           }
-          newCombinations.push(newCombination);
-        } else {
-          newCombinations.push(combination);
+
+          if (isMatch) {
+            matchFound = true;
+            // Create a new combination with the include values
+            const newCombination = { ...combination };
+            for (const [key, value] of Object.entries(stringifiedInclude)) {
+              if (!(key in newCombination)) {
+                newCombination[key] = value;
+              }
+            }
+            newCombinations.push(newCombination);
+          } else {
+            newCombinations.push(combination);
+          }
         }
-      }
 
-      // If no matches found, add as new combination
-      if (!matchFound) {
-        newCombinations.push({ ...stringifiedInclude });
-      }
+        // If no matches found, add as new combination
+        if (!matchFound) {
+          newCombinations.push({ ...stringifiedInclude });
+        }
 
-      combinations = newCombinations;
+        combinations = newCombinations;
+      }
     }
   }
 

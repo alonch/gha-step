@@ -1,4 +1,5 @@
 import { generateMatrixCombinations } from '../matrix';
+import { parse as parseYaml } from 'yaml';
 
 interface TestMatrixItem {
   fruit?: string;
@@ -743,6 +744,281 @@ describe('generateMatrixCombinations', () => {
         combo: [item.fruit, item.color].filter(Boolean).join('-')
       })) as (TestMatrixItem & { combo: string })[];
       expectSameContent(yamlResult, result);
+    });
+
+    it('should parse YAML arrays correctly before expansion', () => {
+      const yamlInput = `
+        - fruit: apple
+          color: [green, red]  # YAML array syntax
+          shape: round
+        - fruit: banana
+          color: yellow,brown  # Comma string syntax
+      `;
+
+      // First verify the YAML parsing
+      const parsed = parseYaml(yamlInput);
+      expect(parsed).toEqual([
+        {
+          fruit: 'apple',
+          color: ['green', 'red'],  // Should be an array
+          shape: 'round'
+        },
+        {
+          fruit: 'banana',
+          color: 'yellow,brown'  // Should be a string
+        }
+      ]);
+
+      // Then verify the matrix expansion
+      const result = generateMatrixCombinations(yamlInput);
+
+      // Log the intermediate state for debugging
+      console.log('Parsed YAML:', JSON.stringify(parsed, null, 2));
+      console.log('Final Result:', JSON.stringify(result, null, 2));
+
+      // Verify each combination is properly expanded
+      const appleResults = result.filter(r => r.fruit === 'apple');
+      expect(appleResults).toEqual(expect.arrayContaining([
+        { fruit: 'apple', color: 'green', shape: 'round' },
+        { fruit: 'apple', color: 'red', shape: 'round' }
+      ]));
+      expect(appleResults.length).toBe(2);
+
+      const bananaResults = result.filter(r => r.fruit === 'banana');
+      expect(bananaResults).toEqual(expect.arrayContaining([
+        { fruit: 'banana', color: 'yellow' },
+        { fruit: 'banana', color: 'brown' }
+      ]));
+      expect(bananaResults.length).toBe(2);
+
+      // Verify no items have comma-separated values
+      for (const item of result) {
+        expect(item.color).not.toContain(',');
+      }
+    });
+
+    it('should handle workflow input format exactly', () => {
+      const input = {
+        matrix: `
+          - os: [ubuntu, macos]
+            arch: [amd64, arm64]
+        `
+      };
+
+      // First verify the YAML parsing
+      const parsed = parseYaml(input.matrix);
+      expect(parsed).toEqual([
+        {
+          os: ['ubuntu', 'macos'],
+          arch: ['amd64', 'arm64']
+        }
+      ]);
+
+      // Then verify the matrix expansion
+      const result = generateMatrixCombinations(input.matrix);
+
+      // Log the intermediate state for debugging
+      console.log('Parsed YAML:', JSON.stringify(parsed, null, 2));
+      console.log('Final Result:', JSON.stringify(result, null, 2));
+
+      // Verify each combination
+      expectSameContent(result, [
+        { os: 'ubuntu', arch: 'amd64' },
+        { os: 'ubuntu', arch: 'arm64' },
+        { os: 'macos', arch: 'amd64' },
+        { os: 'macos', arch: 'arm64' }
+      ]);
+
+      // Verify no items have array values
+      for (const item of result) {
+        expect(Array.isArray(item.os)).toBe(false);
+        expect(Array.isArray(item.arch)).toBe(false);
+      }
+    });
+
+    it('should handle complete workflow structure', () => {
+      const workflowInput = {
+        with: {
+          matrix: `
+            - fruit: apple
+              color: [green, red, yellow]
+              shape: round
+            - fruit: banana
+              color: [yellow, brown]
+          `
+        }
+      };
+
+      // First verify the YAML parsing
+      const parsed = parseYaml(workflowInput.with.matrix);
+      expect(parsed).toEqual([
+        {
+          fruit: 'apple',
+          color: ['green', 'red', 'yellow'],
+          shape: 'round'
+        },
+        {
+          fruit: 'banana',
+          color: ['yellow', 'brown']
+        }
+      ]);
+
+      // Then verify the matrix expansion
+      const result = generateMatrixCombinations(workflowInput.with.matrix);
+
+      // Log the intermediate state for debugging
+      console.log('Workflow Input:', JSON.stringify(workflowInput, null, 2));
+      console.log('Parsed YAML:', JSON.stringify(parsed, null, 2));
+      console.log('Final Result:', JSON.stringify(result, null, 2));
+
+      // Add combo field for testing
+      const resultWithCombos = result.map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      expectSameContent(resultWithCombos, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+
+      // Verify no items have array values or comma-separated strings
+      for (const item of result) {
+        expect(Array.isArray(item.color)).toBe(false);
+        expect(item.color).not.toContain(',');
+      }
+    });
+
+    it('should match workflow validation logic exactly', () => {
+      const input = {
+        with: {
+          matrix: `
+            - fruit: apple
+              color: [green, red, yellow]
+              shape: round
+            - fruit: banana
+              color: [yellow, brown]
+          `
+        }
+      };
+
+      // Get the result
+      const result = generateMatrixCombinations(input.with.matrix);
+
+      // Add combo field for testing
+      const resultWithCombos = result.map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      })) as (TestMatrixItem & { combo: string })[];
+
+      // Log raw result for debugging
+      console.log('Raw Result:', JSON.stringify(resultWithCombos, null, 2));
+
+      // Verify each combination exists using the workflow's approach
+      const expectedCombinations: (TestMatrixItem & { combo: string })[] = [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ];
+
+      // Check each expected combination exists in the result
+      for (const expected of expectedCombinations) {
+        const found = resultWithCombos.some(actual => 
+          Object.entries(expected).every(([key, value]) => (actual as any)[key] === value)
+        );
+        expect(found).toBe(true);
+      }
+
+      // Check we don't have extra combinations
+      expect(resultWithCombos.length).toBe(expectedCombinations.length);
+
+      // Verify no arrays or comma strings in the output
+      for (const item of resultWithCombos) {
+        for (const [key, value] of Object.entries(item)) {
+          expect(Array.isArray(value)).toBe(false);
+          if (typeof value === 'string') {
+            expect(value).not.toContain(',');
+          }
+        }
+      }
+    });
+  });
+
+  describe('outputs.json format', () => {
+    it('should format array values correctly in output', () => {
+      const input = {
+        with: {
+          matrix: `
+            - fruit: apple
+              color: [green, red, yellow]
+              shape: round
+            - fruit: banana
+              color: [yellow, brown]
+          `
+        }
+      };
+
+      // Get the matrix combinations
+      const result = generateMatrixCombinations(input.with.matrix);
+
+      // Simulate the output.json format from index.ts
+      const outputJson = JSON.stringify(result);
+
+      // Parse it back as the workflow would
+      const parsed = JSON.parse(outputJson);
+
+      // Verify the structure matches what the workflow expects
+      expect(parsed).toEqual([
+        { fruit: 'apple', color: 'green', shape: 'round' },
+        { fruit: 'apple', color: 'red', shape: 'round' },
+        { fruit: 'apple', color: 'yellow', shape: 'round' },
+        { fruit: 'banana', color: 'yellow' },
+        { fruit: 'banana', color: 'brown' }
+      ]);
+
+      // Verify no arrays in the stringified output
+      expect(outputJson).not.toContain('[green,red,yellow]');
+      expect(outputJson).not.toContain('[yellow,brown]');
+
+      // Verify no comma-separated values in the stringified output
+      expect(outputJson).not.toMatch(/"color":"[^"]+,[^"]+"/)
+    });
+
+    it('should handle array values in step outputs correctly', () => {
+      const input = {
+        with: {
+          matrix: `
+            - os: [ubuntu]
+          `
+        }
+      };
+
+      const result = generateMatrixCombinations(input.with.matrix);
+
+      // Simulate step outputs
+      const withStepOutputs = result.map(item => ({
+        ...item,
+        tags: ['v1.0', 'latest', 'stable']  // Array output from a step
+      }));
+
+      // Simulate the output.json format
+      const outputJson = JSON.stringify(withStepOutputs);
+
+      // Parse it back as the workflow would
+      const parsed = JSON.parse(outputJson);
+
+      // Verify the structure
+      expect(parsed).toEqual([
+        { os: 'ubuntu', tags: ['v1.0', 'latest', 'stable'] }
+      ]);
+
+      // Arrays from step outputs should remain as arrays
+      expect(parsed[0].tags).toEqual(['v1.0', 'latest', 'stable']);
     });
   });
 }); 
