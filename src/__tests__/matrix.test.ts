@@ -505,5 +505,37 @@ describe('generateMatrixCombinations', () => {
       expect(bananaResults.map(r => r.color)).toEqual(expect.arrayContaining(['yellow', 'brown']));
       expect(bananaResults.length).toBe(2);
     });
+
+    it('should handle array values with combo fields', () => {
+      const input = {
+        include: [
+          { 
+            fruit: 'apple',
+            color: ['green', 'red', 'yellow'],
+            shape: 'round'
+          },
+          {
+            fruit: 'banana',
+            color: 'yellow,brown'
+          }
+        ]
+      };
+
+      const result = generateMatrixCombinations(input);
+      
+      // Add combo field for testing
+      const resultWithCombos = result.map(item => ({
+        ...item,
+        combo: [item.fruit, item.color].filter(Boolean).join('-')
+      }));
+
+      expectSameContent(resultWithCombos, [
+        { fruit: 'apple', color: 'green', shape: 'round', combo: 'apple-green' },
+        { fruit: 'apple', color: 'red', shape: 'round', combo: 'apple-red' },
+        { fruit: 'apple', color: 'yellow', shape: 'round', combo: 'apple-yellow' },
+        { fruit: 'banana', color: 'yellow', combo: 'banana-yellow' },
+        { fruit: 'banana', color: 'brown', combo: 'banana-brown' }
+      ]);
+    });
   });
 }); 

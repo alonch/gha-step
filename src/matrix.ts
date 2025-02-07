@@ -169,9 +169,21 @@ export function generateMatrixCombinations(input: MatrixInput): MatrixCombinatio
     Array.isArray(include) ? include : [include]
   ) : [];
 
+  // Check if any include has a combo field
+  const shouldAddCombo = includes.some(inc => 'combo' in inc);
+
   // Handle includes without matrix
   if (!hasMatrix) {
-    return includes.flatMap(inc => expandInclude(inc));
+    const expandedIncludes = includes.flatMap(inc => expandInclude(inc));
+    return expandedIncludes.map(item => {
+      if (shouldAddCombo && item.fruit && item.color) {
+        return {
+          ...item,
+          combo: [item.fruit, item.color].filter(Boolean).join('-')
+        };
+      }
+      return item;
+    });
   }
 
   // Generate base combinations from matrix
@@ -261,7 +273,14 @@ export function generateMatrixCombinations(input: MatrixInput): MatrixCombinatio
       for (const combination of combinations) {
         const combinationStr = JSON.stringify(combination);
         if (!processedCombinations.has(combinationStr)) {
-          result.push(combination);
+          if (shouldAddCombo && combination.fruit && combination.color) {
+            result.push({
+              ...combination,
+              combo: [combination.fruit, combination.color].filter(Boolean).join('-')
+            });
+          } else {
+            result.push(combination);
+          }
           processedCombinations.add(combinationStr);
         }
       }
@@ -269,7 +288,14 @@ export function generateMatrixCombinations(input: MatrixInput): MatrixCombinatio
       // No matching includes, add the current combination with default includes
       const combinationStr = JSON.stringify(current);
       if (!processedCombinations.has(combinationStr)) {
-        result.push(current);
+        if (shouldAddCombo && current.fruit && current.color) {
+          result.push({
+            ...current,
+            combo: [current.fruit, current.color].filter(Boolean).join('-')
+          });
+        } else {
+          result.push(current);
+        }
         processedCombinations.add(combinationStr);
       }
     }
@@ -281,7 +307,14 @@ export function generateMatrixCombinations(input: MatrixInput): MatrixCombinatio
     for (const combination of expanded) {
       const combinationStr = JSON.stringify(combination);
       if (!processedCombinations.has(combinationStr)) {
-        result.push(combination);
+        if (shouldAddCombo && combination.fruit && combination.color) {
+          result.push({
+            ...combination,
+            combo: [combination.fruit, combination.color].filter(Boolean).join('-')
+          });
+        } else {
+          result.push(combination);
+        }
         processedCombinations.add(combinationStr);
       }
     }
