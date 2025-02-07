@@ -51,6 +51,41 @@ jobs:
             exit 1
           fi
 
+      - name: Test Array Outputs
+        id: array-test
+        uses: ./
+        with:
+          matrix: |
+            - os: [ubuntu]
+          steps: |
+            - name: Multiple Outputs
+              id: multi
+              run: |
+                echo "tags=v1.0" >> $STEPS_OUTPUTS
+                echo "tags=latest" >> $STEPS_OUTPUTS
+                echo "tags=stable" >> $STEPS_OUTPUTS
+                echo "arch=x64" >> $STEPS_OUTPUTS
+          outputs: |
+            - tags: ${ STEPS_MULTI_TAGS }
+            - arch: ${ STEPS_MULTI_ARCH }
+
+      - name: Validate Array Outputs
+        run: |
+          output='${{ steps.array-test.outputs.json }}'
+          expected='[{"os":"ubuntu","tags":["v1.0","latest","stable"],"arch":"x64"}]'
+          
+          # Compare the outputs
+          if [ "$(echo "$output" | jq -S .)" != "$(echo "$expected" | jq -S .)" ]; then
+            echo "Array output test failed. Showing both versions:"
+            echo "Expected:"
+            echo "$expected" | jq .
+            echo "Got:"
+            echo "$output" | jq .
+            echo "Showing diff:"
+            diff -u <(echo "$expected" | jq .) <(echo "$output" | jq .) || true
+            exit 1
+          fi
+
       - name: Test Step Dependencies
         id: dependency-test
         uses: ./

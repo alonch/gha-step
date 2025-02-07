@@ -64,7 +64,7 @@ This action allows you to run steps in parallel using a matrix strategy, similar
 |--------------|----------------------------------------------------------------------------|----------|----------|
 | matrix       | Matrix configuration in YAML format defining parallel execution combinations | Yes      | -        |
 | steps        | List of steps to execute sequentially for each matrix combination          | Yes      | -        |
-| outputs      | List of outputs to collect from steps                                      | Yes      | -        |
+| outputs      | List of outputs to collect from steps                                      | No      | -        |
 | max-parallel | Maximum number of matrix combinations to run in parallel                    | No       | ∞        |
 
 ### matrix
@@ -119,7 +119,7 @@ matrix: |
 3. JSON string include:
 ```yaml
 matrix: |
-  - include: ${{ toJSON(fromJSON(steps.previous.outputs.matrix)) }}
+  - include: ${{ steps.previous.outputs.json }}
 ```
 
 The include system allows for complex scenarios like:
