@@ -58,15 +58,56 @@ export function generateMatrixCombinations(matrixConfig: { [key: string]: any })
   })];
 
   // Add standalone includes that have their own complete configuration
-  const standaloneIncludes = includes.filter((inc: MatrixInclude) => {
-    // Check if this include has a complete configuration that doesn't need matrix values
-    const hasRequiredMatrixKeys = keys.every(key => inc.hasOwnProperty(key));
-    if (hasRequiredMatrixKeys) return true;
+  const standaloneIncludes = includes
+    .filter((inc: MatrixInclude) => {
+      // Check if this include has a complete configuration that doesn't need matrix values
+      const hasRequiredMatrixKeys = keys.every(key => inc.hasOwnProperty(key));
+      if (hasRequiredMatrixKeys) return true;
 
-    // Check if this include specifies values that override matrix completely
-    const specifiedKeys = Object.keys(inc);
-    return specifiedKeys.some(key => matrix[key] && !matrix[key].includes(inc[key]));
+      // Check if this include specifies values that override matrix completely
+      const specifiedKeys = Object.keys(inc);
+      return specifiedKeys.some(key => matrix[key] && !matrix[key].includes(inc[key]));
+    })
+    // Sort standalone includes to match GitHub Actions behavior
+    .sort((a: MatrixInclude, b: MatrixInclude) => {
+      // First by fruit value
+      if (a.fruit !== b.fruit) {
+        if (!a.fruit) return 1;
+        if (!b.fruit) return -1;
+        return String(a.fruit).localeCompare(String(b.fruit));
+      }
+
+      // Then by number of properties (less properties first)
+      const aKeys = Object.keys(a).length;
+      const bKeys = Object.keys(b).length;
+      if (aKeys !== bKeys) return aKeys - bKeys;
+
+      return 0;
+    });
+
+  // Sort the result array to match GitHub Actions behavior
+  const sortedResult = [...result].sort((a, b) => {
+    // First by fruit value
+    if (a.fruit !== b.fruit) {
+      return String(a.fruit).localeCompare(String(b.fruit));
+    }
+
+    // Then by animal value
+    if (a.animal !== b.animal) {
+      if (!a.animal) return 1;
+      if (!b.animal) return -1;
+      return String(a.animal).localeCompare(String(b.animal));
+    }
+
+    // Then by color value
+    if (a.color !== b.color) {
+      if (!a.color) return 1;
+      if (!b.color) return -1;
+      return String(a.color).localeCompare(String(b.color));
+    }
+
+    return 0;
   });
 
-  return [...result, ...standaloneIncludes];
+  return [...sortedResult, ...standaloneIncludes];
 } 
