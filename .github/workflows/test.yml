@@ -272,29 +272,36 @@ jobs:
           
           # Check each expected combination
           expected_combinations=(
-            '{"color":"green","combo":"green"}'
-            '{"color":"pink","animal":"cat","combo":"pink-cat"}'
-            '{"fruit":"apple","shape":"circle","combo":"apple-circle"}'
-            '{"fruit":"banana","combo":"banana"}'
-            '{"fruit":"banana","animal":"cat","combo":"banana-cat"}'
+            # Color includes get combined with other includes
+            '{"color":"pink","animal":"cat","fruit":"apple","shape":"circle","combo":"pink-cat-apple-circle"}'
+            '{"color":"green","fruit":"apple","shape":"circle","combo":"green-apple-circle"}'
+            # Banana includes stay separate
+            '{"fruit":"banana","animal":"cat","combo":"cat-banana"}'
           )
 
           # Verify count matches
           count=$(echo "$output" | jq length)
           if [ "$count" -ne "${#expected_combinations[@]}" ]; then
             echo "Expected ${#expected_combinations[@]} combinations, but got $count"
-            echo "Output: $output"
+            echo "Full output:"
+            echo "$output" | jq .
             exit 1
           fi
 
           # Check each combination exists
+          failed=0
           for combination in "${expected_combinations[@]}"; do
             if ! echo "$output" | jq -e --arg combo "$combination" 'contains([($combo | fromjson)])' > /dev/null; then
               echo "Missing expected combination: $combination"
-              echo "Output: $output"
-              exit 1
+              failed=1
             fi
           done
+
+          if [ $failed -eq 1 ]; then
+            echo "Full output:"
+            echo "$output" | jq .
+            exit 1
+          fi
 
       - name: Test Include From JSON
         id: json-include-test
@@ -321,26 +328,33 @@ jobs:
           
           # Check each expected combination
           expected_combinations=(
-            '{"color":"green","combo":"green"}'
-            '{"color":"pink","animal":"cat","combo":"pink-cat"}'
-            '{"fruit":"apple","shape":"circle","combo":"apple-circle"}'
-            '{"fruit":"banana","combo":"banana"}'
-            '{"fruit":"banana","animal":"cat","combo":"banana-cat"}'
+            # Color includes get combined with other includes
+            '{"color":"pink","animal":"cat","fruit":"apple","shape":"circle","combo":"pink-cat-apple-circle"}'
+            '{"color":"green","fruit":"apple","shape":"circle","combo":"green-apple-circle"}'
+            # Banana includes stay separate
+            '{"fruit":"banana","animal":"cat","combo":"cat-banana"}'
           )
 
           # Verify count matches
           count=$(echo "$output" | jq length)
           if [ "$count" -ne "${#expected_combinations[@]}" ]; then
             echo "Expected ${#expected_combinations[@]} combinations, but got $count"
-            echo "Output: $output"
+            echo "Full output:"
+            echo "$output" | jq .
             exit 1
           fi
 
           # Check each combination exists
+          failed=0
           for combination in "${expected_combinations[@]}"; do
             if ! echo "$output" | jq -e --arg combo "$combination" 'contains([($combo | fromjson)])' > /dev/null; then
               echo "Missing expected combination: $combination"
-              echo "Output: $output"
-              exit 1
+              failed=1
             fi
-          done 
+          done
+
+          if [ $failed -eq 1 ]; then
+            echo "Full output:"
+            echo "$output" | jq .
+            exit 1
+          fi 
