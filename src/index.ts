@@ -59,13 +59,13 @@ async function run(): Promise<void> {
     // Parse inputs
     const matrixInput = core.getInput('matrix', { required: true });
     const stepsInput = core.getInput('steps', { required: true });
-    const outputsInput = core.getInput('outputs', { required: true });
+    const outputsInput = core.getInput('outputs', { required: false });
 
     // Parse YAML inputs
     const matrixConfig = yaml.parse(matrixInput);
     validateMatrixConfig(matrixConfig);
     const steps = yaml.parse(stepsInput) as StepDefinition[];
-    const outputs = yaml.parse(outputsInput);
+    const outputs = outputsInput ? yaml.parse(outputsInput) : [];
 
     if (!matrixConfig[0]) {
       throw new Error('Invalid matrix configuration');
