@@ -5,12 +5,25 @@ This action allows you to run steps in parallel using a matrix strategy, similar
 ## Features
 
 - Run steps in parallel using matrix combinations
-- Powerful matrix include system for extending and customizing combinations
-- Conditional matrix value additions based on existing combinations
-- Create standalone matrix entries for special cases
-- Pass outputs between steps
-- Access matrix values as environment variables
-- Collect and combine outputs from all matrix executions
+- Flexible matrix configuration:
+  - Basic matrix combinations with multiple dimensions
+  - Powerful include system for extending and customizing combinations
+  - Support for include-only matrices
+  - JSON string includes for dynamic matrix generation
+  - Conditional value additions based on matrix values
+  - Standalone combinations for special cases
+- Execution control:
+  - Parallel execution by default
+  - Optional sequential execution with max-parallel: 1
+  - Configurable parallel execution with max-parallel > 1
+- Step management:
+  - Sequential step execution within each combination
+  - Pass outputs between steps using environment variables
+  - Automatic cleanup of step outputs
+- Rich output handling:
+  - Access matrix values as environment variables
+  - Collect and combine outputs from all matrix combinations
+  - Detailed execution status and error reporting
 
 ## Usage
 
@@ -70,8 +83,15 @@ Use `include` to expand existing matrix configurations or add new combinations. 
    - Key-value pairs are added to each matrix combination if they don't overwrite existing values
    - If an object can't be added to any existing combination without overwriting values, it creates a new combination
    - Original matrix values are preserved, but added values can be overwritten by subsequent includes
+   - Includes are processed in order, allowing later includes to override earlier ones
 
-Example with includes:
+The include field supports two formats:
+1. Array of objects in YAML
+2. JSON string containing an array of objects
+
+Examples:
+
+1. Basic include with conditions:
 ```yaml
 matrix: |
   - os: [windows-latest, ubuntu-latest]
@@ -85,16 +105,29 @@ matrix: |
         node: 18
 ```
 
-This results in:
-```json
-[
-  {"os": "windows-latest", "node": "14", "color": "green"},
-  {"os": "windows-latest", "node": "16", "npm": "6", "color": "green"},
-  {"os": "ubuntu-latest", "node": "14", "color": "green"},
-  {"os": "ubuntu-latest", "node": "16", "color": "green"},
-  {"os": "macos", "node": "18"}
-]
+2. Include-only matrix (no base combinations):
+```yaml
+matrix: |
+  - include:
+      - os: ubuntu-latest
+        node: 14
+      - os: windows-latest
+        node: 16
+        npm: 6
 ```
+
+3. JSON string include:
+```yaml
+matrix: |
+  - include: ${{ toJSON(fromJSON(steps.previous.outputs.matrix)) }}
+```
+
+The include system allows for complex scenarios like:
+- Adding default values to all combinations
+- Creating conditional additions based on specific matrix values
+- Overriding specific combinations with custom values
+- Creating standalone combinations for special cases
+- Chaining matrix results between steps using JSON includes
 
 ### steps
 List of steps to execute. Each step must have:
