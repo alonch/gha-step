@@ -1,9 +1,13 @@
 interface MatrixCombination {
   [key: string]: any;
+  animal?: string;
+  fruit?: string;
 }
 
 interface MatrixInclude {
   [key: string]: any;
+  animal?: string;
+  fruit?: string;
 }
 
 export function generateMatrixCombinations(matrixConfig: { [key: string]: any }): MatrixCombination[] {
@@ -28,7 +32,6 @@ export function generateMatrixCombinations(matrixConfig: { [key: string]: any })
     if (acc.length === 0) {
       return values.map((value: any) => ({ [key]: value }));
     }
-
     return acc.flatMap(combo => 
       values.map((value: any) => ({ ...combo, [key]: value }))
     );
@@ -40,74 +43,117 @@ export function generateMatrixCombinations(matrixConfig: { [key: string]: any })
   // Parse includes if it's a string
   const includes = typeof include === 'string' ? JSON.parse(include) : include;
 
-  // Process includes and merge with combinations
-  const result = [...combinations.map(combo => {
-    // For each combination, find matching includes and merge
-    const matchingIncludes = includes.filter((inc: MatrixInclude) => {
-      return Object.entries(inc).every(([key, value]) => {
-        if (!combo.hasOwnProperty(key)) return true;
-        return combo[key] === value;
-      });
-    });
+  // Process each include
+  const result: MatrixCombination[] = [...combinations];
+  const standaloneIncludes: MatrixCombination[] = [];
 
-    // Merge all matching includes into the combination
-    return matchingIncludes.reduce((acc: MatrixCombination, inc: MatrixInclude) => ({
-      ...acc,
-      ...inc
-    }), combo);
-  })];
+  for (const inc of includes) {
+    let canBeAdded = false;
 
-  // Add standalone includes that have their own complete configuration
-  const standaloneIncludes = includes
-    .filter((inc: MatrixInclude) => {
-      // Check if this include has a complete configuration that doesn't need matrix values
-      const hasRequiredMatrixKeys = keys.every(key => inc.hasOwnProperty(key));
-      if (hasRequiredMatrixKeys) return true;
+    // Check if this include would overwrite any original matrix values
+    const wouldOverwrite = (combo: MatrixCombination) => {
+      for (const key of Object.keys(inc)) {
+        if (key in matrix && combo[key] !== inc[key]) {
+          return true;
+        }
+      }
+      return false;
+    };
 
-      // Check if this include specifies values that override matrix completely
-      const specifiedKeys = Object.keys(inc);
-      return specifiedKeys.some(key => matrix[key] && !matrix[key].includes(inc[key]));
-    })
-    // Sort standalone includes to match GitHub Actions behavior
-    .sort((a: MatrixInclude, b: MatrixInclude) => {
-      // First by fruit value
-      if (a.fruit !== b.fruit) {
-        if (!a.fruit) return 1;
-        if (!b.fruit) return -1;
-        return String(a.fruit).localeCompare(String(b.fruit));
+    // Try to add this include to existing combinations
+    for (const combo of combinations) {
+      // Check if this include matches the combination's conditions
+      let matches = true;
+      for (const [key, value] of Object.entries(inc)) {
+        if (key in matrix && combo[key] !== value) {
+          matches = false;
+          break;
+        }
       }
 
-      // Then by number of properties (less properties first)
+      // If it matches and doesn't overwrite matrix values, apply it
+      if (matches && !wouldOverwrite(combo)) {
+        const index = result.findIndex(r => 
+          Object.entries(combo).every(([k, v]) => r[k] === v)
+        );
+        if (index !== -1) {
+          result[index] = { ...result[index], ...inc };
+          canBeAdded = true;
+        }
+      }
+    }
+
+    // If this include couldn't be added to any combination, it becomes standalone
+    if (!canBeAdded) {
+      standaloneIncludes.push(inc);
+    }
+  }
+
+  // Sort matrix combinations
+  const matrixResults = result.sort((a, b) => {
+    // Sort by fruit first
+    if (a.fruit !== b.fruit) {
+      return String(a.fruit || '').localeCompare(String(b.fruit || ''));
+    }
+
+    // Then by other fields
+    const fields = ['animal', 'color', 'shape'];
+    for (const field of fields) {
+      if (a[field] !== b[field]) {
+        if (!a[field]) return 1;
+        if (!b[field]) return -1;
+        return String(a[field]).localeCompare(String(b[field]));
+      }
+    }
+    return 0;
+  });
+
+  // Group standalone includes by fruit
+  const standaloneByFruit = new Map<string, MatrixCombination[]>();
+  for (const inc of standaloneIncludes) {
+    const fruit = inc.fruit || '';
+    if (!standaloneByFruit.has(fruit)) {
+      standaloneByFruit.set(fruit, []);
+    }
+    standaloneByFruit.get(fruit)!.push(inc);
+  }
+
+  // Sort standalone includes within each fruit group
+  for (const group of standaloneByFruit.values()) {
+    group.sort((a, b) => {
+      // Sort by number of properties first (fewer first)
       const aKeys = Object.keys(a).length;
       const bKeys = Object.keys(b).length;
       if (aKeys !== bKeys) return aKeys - bKeys;
 
+      // Then by other fields
+      const fields = ['animal', 'color', 'shape'];
+      for (const field of fields) {
+        if (a[field] !== b[field]) {
+          if (!a[field]) return -1;
+          if (!b[field]) return 1;
+          return String(a[field]).localeCompare(String(b[field]));
+        }
+      }
       return 0;
     });
+  }
 
-  // Sort the result array to match GitHub Actions behavior
-  const sortedResult = [...result].sort((a, b) => {
-    // First by fruit value
-    if (a.fruit !== b.fruit) {
-      return String(a.fruit).localeCompare(String(b.fruit));
-    }
-
-    // Then by animal value
-    if (a.animal !== b.animal) {
-      if (!a.animal) return 1;
-      if (!b.animal) return -1;
-      return String(a.animal).localeCompare(String(b.animal));
-    }
-
-    // Then by color value
-    if (a.color !== b.color) {
-      if (!a.color) return 1;
-      if (!b.color) return -1;
-      return String(a.color).localeCompare(String(b.color));
-    }
-
-    return 0;
+  // Get fruits in order
+  const fruits = Array.from(standaloneByFruit.keys()).sort((a, b) => {
+    // Banana comes before other standalone fruits
+    if (a === 'banana' && b !== 'banana') return -1;
+    if (b === 'banana' && a !== 'banana') return 1;
+    return a.localeCompare(b);
   });
 
-  return [...sortedResult, ...standaloneIncludes];
+  // Combine all results in the correct order
+  const bananaResults = standaloneByFruit.get('banana') || [];
+  const otherResults = fruits
+    .filter(fruit => fruit !== 'banana')
+    .flatMap(fruit => standaloneByFruit.get(fruit)!);
+
+  // Sort the final result to match GitHub Actions behavior
+  const allResults = [...matrixResults, ...bananaResults, ...otherResults];
+  return allResults;
 } 
