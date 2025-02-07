@@ -172,47 +172,61 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
       includes = matrixConfig.include;
     }
 
-    // Process each include entry
-    for (const include of includes) {
+    // First, add the global includes (those without matching keys)
+    const globalIncludes = includes.filter(include => {
       const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
         acc[key] = String(value);
         return acc;
       }, {} as MatrixCombination);
 
-      if (combinations.length === 0) {
-        // If no base combinations, add include as a new combination
-        combinations.push({ ...stringifiedInclude });
-        continue;
-      }
+      // Check if this include has any matching keys with existing combinations
+      return !combinations.some(combination => {
+        for (const key of Object.keys(stringifiedInclude)) {
+          if (key in combination) return true;
+        }
+        return false;
+      });
+    });
 
+    // Add global includes as new combinations
+    globalIncludes.forEach(include => {
+      const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
+        acc[key] = String(value);
+        return acc;
+      }, {} as MatrixCombination);
+      combinations.push(stringifiedInclude);
+    });
+
+    // Then process specific includes (those with matching keys)
+    const specificIncludes = includes.filter(include => !globalIncludes.includes(include));
+    for (const include of specificIncludes) {
+      const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
+        acc[key] = String(value);
+        return acc;
+      }, {} as MatrixCombination);
+
+      // Find matching combinations
       let matchFound = false;
-      const combinationsToAdd: MatrixCombination[] = [];
-
-      // Try to enhance existing combinations
-      for (let i = 0; i < combinations.length; i++) {
-        const combination = combinations[i];
-        let canEnhance = true;
-
-        // Check if this combination can be enhanced
+      const matchingCombinations = combinations.filter(combination => {
+        // Check if this combination matches all shared keys
         for (const [key, value] of Object.entries(stringifiedInclude)) {
           if (key in combination && combination[key] !== value) {
-            canEnhance = false;
-            break;
+            return false;
           }
         }
+        return true;
+      });
 
-        if (canEnhance) {
-          matchFound = true;
-          // Create enhanced combination
-          const enhanced = { ...combination };
+      if (matchingCombinations.length > 0) {
+        matchFound = true;
+        // Enhance matching combinations
+        matchingCombinations.forEach(combination => {
           for (const [key, value] of Object.entries(stringifiedInclude)) {
-            if (!(key in enhanced)) {
-              enhanced[key] = value;
+            if (!(key in combination)) {
+              combination[key] = value;
             }
           }
-          // Replace the original combination with the enhanced one
-          combinations[i] = enhanced;
-        }
+        });
       }
 
       // If no matches found, add as new combination
@@ -286,4 +300,5 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
   return outputs;
 }
 
+run();
 run();
