@@ -122,12 +122,60 @@ matrix: |
   - include: ${{ steps.previous.outputs.json }}
 ```
 
-The include system allows for complex scenarios like:
-- Adding default values to all combinations
-- Creating conditional additions based on specific matrix values
-- Overriding specific combinations with custom values
-- Creating standalone combinations for special cases
-- Chaining matrix results between steps using JSON includes
+4. Array values in includes:
+```yaml
+matrix: |
+  - include:
+      - os: ubuntu-latest
+        arch: [amd64, arm64]  # Will create separate combinations for each value
+      - os: windows-latest
+        arch: amd64,arm64     # Comma-separated strings also work as arrays
+```
+
+5. Array expansion works in both standalone includes and when combining with base matrix
+
+Complex array example:
+```yaml
+matrix: |
+  - include:
+      - fruit: apple
+        color: [green, red, yellow]  # Creates 3 combinations
+        shape: round
+      - fruit: banana
+        color: yellow,brown          # Creates 2 combinations
+```
+
+This will generate:
+```json
+[
+  {"fruit": "apple", "color": "green", "shape": "round"},
+  {"fruit": "apple", "color": "red", "shape": "round"},
+  {"fruit": "apple", "color": "yellow", "shape": "round"},
+  {"fruit": "banana", "color": "yellow"},
+  {"fruit": "banana", "color": "brown"}
+]
+```
+
+Example with base matrix:
+```yaml
+matrix: |
+  - os: [ubuntu, macos]
+    arch: amd64
+    include:
+      - os: ubuntu
+        version: [18.04, 20.04]  # Only for ubuntu
+      - os: macos
+        version: 12             # Single version for macos
+```
+
+This will generate:
+```json
+[
+  {"os": "ubuntu", "arch": "amd64", "version": "18.04"},
+  {"os": "ubuntu", "arch": "amd64", "version": "20.04"},
+  {"os": "macos", "arch": "amd64", "version": "12"}
+]
+```
 
 ### steps
 List of steps to execute. Each step must have:

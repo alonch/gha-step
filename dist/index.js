@@ -25977,7 +25977,7 @@ async function executeSteps(steps, matrix) {
             // Read step outputs
             try {
                 const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
-                    const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: false });
+                    const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
                     return stdout;
                 });
                 // Parse outputs using our new collectStepOutputs function
