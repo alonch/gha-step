@@ -199,6 +199,53 @@ jobs:
           outputs: |
             - combo: ${ STEPS_ECHO_COMBO }
 
+      - name: Test Real World Matrix
+        id: real-world-test
+        uses: ./
+        with:
+          matrix: |
+            - os: [windows-latest, ubuntu-latest]
+              node: [14, 16]
+              include:
+                - os: windows-latest
+                  node: 16
+                  npm: 6
+          steps: |
+            - name: Echo Configuration
+              id: config
+              run: |
+                echo "setup=$MATRIX_OS-node$MATRIX_NODE${MATRIX_NPM:+-npm$MATRIX_NPM}" >> $STEPS_OUTPUTS
+          outputs: |
+            - setup: ${ STEPS_CONFIG_SETUP }
+
+      - name: Validate Real World Matrix Output
+        run: |
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort '${{ steps.real-world-test.outputs.json }}')
+          expected_sorted=$(normalize_and_sort '[
+            {"os":"windows-latest","node":"14","setup":"windows-latest-node14"},
+            {"os":"windows-latest","node":"16","npm":"6","setup":"windows-latest-node16-npm6"},
+            {"os":"ubuntu-latest","node":"14","setup":"ubuntu-latest-node14"},
+            {"os":"ubuntu-latest","node":"16","setup":"ubuntu-latest-node16"}
+          ]')
+          
+          # Compare the sorted JSONs
+          if [ "$output_sorted" != "$expected_sorted" ]; then
+            echo "JSON comparison failed. Showing both versions:"
+            echo "Expected (sorted):"
+            echo "$expected_sorted" | jq .
+            echo "Got (sorted):"
+            echo "$output_sorted" | jq .
+            echo "Showing diff:"
+            diff -u <(echo "$expected_sorted" | jq .) <(echo "$output_sorted" | jq .) || true
+            exit 1
+          fi
+
       - name: Validate Include Output
         run: |
           output='${{ steps.include-test.outputs.json }}'
