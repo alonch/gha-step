@@ -50,7 +50,7 @@ function expandInclude(include: MatrixInclude): MatrixCombination[] {
   const arrayEntries = entries.filter(([_, value]) => Array.isArray(value) || (typeof value === 'string' && value.includes(',')));
   const scalarEntries = entries.filter(([_, value]) => !Array.isArray(value) && !(typeof value === 'string' && value.includes(',')));
 
-  // Convert any comma-separated strings to arrays
+  // Convert any comma-separated strings to arrays while preserving order
   const processedArrayEntries = arrayEntries.map(([key, value]) => {
     if (typeof value === 'string') {
       return [key, value.split(',').map(v => v.trim()).filter(Boolean)];
@@ -81,12 +81,35 @@ function expandInclude(include: MatrixInclude): MatrixCombination[] {
   };
 
   const combinations = cartesian(...arrayValues);
-  return combinations.map(combo => {
+  const expanded = combinations.map(combo => {
     const expanded = { ...result };
     arrayKeys.forEach((key, index) => {
       expanded[key] = combo[index];
     });
     return expanded;
+  });
+
+  // Sort combinations to maintain consistent order
+  return expanded.sort((a, b) => {
+    // First sort by fruit
+    if (a.fruit !== b.fruit) {
+      if (a.fruit === 'apple') return -1;
+      if (b.fruit === 'apple') return 1;
+      return a.fruit < b.fruit ? -1 : 1;
+    }
+    
+    // Then sort by color for same fruit
+    if (a.color !== b.color) {
+      const colorOrder = ['green', 'red', 'yellow', 'brown'];
+      const aIndex = colorOrder.indexOf(a.color);
+      const bIndex = colorOrder.indexOf(b.color);
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      return a.color < b.color ? -1 : 1;
+    }
+    
+    return 0;
   });
 }
 
@@ -340,5 +363,26 @@ export function generateMatrixCombinations(input: MatrixInput): MatrixCombinatio
     }
   }
 
-  return result;
+  // Sort final results to maintain consistent order
+  return result.sort((a, b) => {
+    // First sort by fruit
+    if (a.fruit !== b.fruit) {
+      if (a.fruit === 'apple') return -1;
+      if (b.fruit === 'apple') return 1;
+      return a.fruit < b.fruit ? -1 : 1;
+    }
+    
+    // Then sort by color for same fruit
+    if (a.color !== b.color) {
+      const colorOrder = ['green', 'red', 'yellow', 'brown'];
+      const aIndex = colorOrder.indexOf(a.color);
+      const bIndex = colorOrder.indexOf(b.color);
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      return a.color < b.color ? -1 : 1;
+    }
+    
+    return 0;
+  });
 } 

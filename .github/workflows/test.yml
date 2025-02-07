@@ -480,7 +480,7 @@ jobs:
           ]'
           
           # Compare the outputs
-          if [ "$(echo "$output" | jq -S .)" != "$(echo "$expected" | jq -S .)" ]; then
+          if ! diff -u <(echo "$expected" | jq -S .) <(echo "$output" | jq -S .); then
             echo "Array include test failed. Showing both versions:"
             echo "Expected:"
             echo "$expected" | jq .
