@@ -1,18 +1,22 @@
-name: 'GitHub Action Steps with Matrix'
+name: 'Matrix Steps'
 description: 'Run steps in parallel using matrix strategy'
 inputs:
   matrix:
-    description: 'Matrix configuration for parallel execution'
+    description: 'Matrix configuration in YAML format'
     required: true
   steps:
-    description: 'Steps to execute in sequence'
+    description: 'Steps to execute in YAML format'
     required: true
   outputs:
-    description: 'Output variables to collect from steps'
-    required: true
+    description: 'Outputs to collect in YAML format'
+    required: false
+  max-parallel:
+    description: 'Maximum number of matrix combinations to run in parallel'
+    required: false
+    default: '0'
 outputs:
   json:
-    description: 'JSON output containing all matrix results'
+    description: 'JSON array containing results from all matrix combinations'
 runs:
   using: 'node20'
   main: 'dist/index.js' 

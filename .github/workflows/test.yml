@@ -122,6 +122,7 @@ jobs:
             - number: [1, 2, 3, 4, 5]
           steps: |
             - name: Sleep Step
+              id: sleep
               run: sleep 1
 
       - name: Validate Parallel Execution
@@ -149,6 +150,7 @@ jobs:
           max-parallel: 1
           steps: |
             - name: Sleep Step
+              id: sleep
               run: sleep 1
 
       - name: Validate Sequential Execution
