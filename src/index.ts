@@ -132,7 +132,7 @@ async function run(): Promise<void> {
 }
 
 function generateMatrixCombinations(matrixConfig: { [key: string]: any }): MatrixCombination[] {
-  const combinations: MatrixCombination[] = [];
+  let combinations: MatrixCombination[] = [];
   
   // Handle regular matrix combinations
   const regularEntries = Object.entries(matrixConfig).filter(([key]) => key !== 'include');
@@ -148,13 +148,13 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
     };
 
     const baseCombinations = cartesian(...values);
-    combinations.push(...baseCombinations.map((combo: (string | number)[]) => {
+    combinations = baseCombinations.map((combo: (string | number)[]) => {
       const result: MatrixCombination = {};
       keys.forEach((key, index) => {
         result[key] = String(combo[index]);
       });
       return result;
-    }));
+    });
   }
 
   // Handle includes
@@ -172,67 +172,54 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
       includes = matrixConfig.include;
     }
 
-    // First, add the global includes (those without matching keys)
-    const globalIncludes = includes.filter(include => {
+    // Process each include entry in order
+    for (const include of includes) {
       const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
         acc[key] = String(value);
         return acc;
       }, {} as MatrixCombination);
 
-      // Check if this include has any matching keys with existing combinations
-      return !combinations.some(combination => {
-        for (const key of Object.keys(stringifiedInclude)) {
-          if (key in combination) return true;
-        }
-        return false;
-      });
-    });
+      // If there are no combinations yet, just add the include
+      if (combinations.length === 0) {
+        combinations.push({ ...stringifiedInclude });
+        continue;
+      }
 
-    // Add global includes as new combinations
-    globalIncludes.forEach(include => {
-      const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
-        acc[key] = String(value);
-        return acc;
-      }, {} as MatrixCombination);
-      combinations.push(stringifiedInclude);
-    });
-
-    // Then process specific includes (those with matching keys)
-    const specificIncludes = includes.filter(include => !globalIncludes.includes(include));
-    for (const include of specificIncludes) {
-      const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
-        acc[key] = String(value);
-        return acc;
-      }, {} as MatrixCombination);
-
-      // Find matching combinations
+      // Check if this include matches any existing combinations
       let matchFound = false;
-      const matchingCombinations = combinations.filter(combination => {
-        // Check if this combination matches all shared keys
+      const newCombinations: MatrixCombination[] = [];
+
+      for (const combination of combinations) {
+        let isMatch = true;
+        // Check if all shared keys match
         for (const [key, value] of Object.entries(stringifiedInclude)) {
           if (key in combination && combination[key] !== value) {
-            return false;
+            isMatch = false;
+            break;
           }
         }
-        return true;
-      });
 
-      if (matchingCombinations.length > 0) {
-        matchFound = true;
-        // Enhance matching combinations
-        matchingCombinations.forEach(combination => {
+        if (isMatch) {
+          matchFound = true;
+          // Create a new combination with the include values
+          const newCombination = { ...combination };
           for (const [key, value] of Object.entries(stringifiedInclude)) {
-            if (!(key in combination)) {
-              combination[key] = value;
+            if (!(key in newCombination)) {
+              newCombination[key] = value;
             }
           }
-        });
+          newCombinations.push(newCombination);
+        } else {
+          newCombinations.push(combination);
+        }
       }
 
       // If no matches found, add as new combination
       if (!matchFound) {
-        combinations.push({ ...stringifiedInclude });
+        newCombinations.push({ ...stringifiedInclude });
       }
+
+      combinations = newCombinations;
     }
   }
 
@@ -300,5 +287,6 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
   return outputs;
 }
 
+run();
 run();
 run();

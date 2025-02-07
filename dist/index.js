@@ -25784,7 +25784,7 @@ async function run() {
     }
 }
 function generateMatrixCombinations(matrixConfig) {
-    const combinations = [];
+    let combinations = [];
     // Handle regular matrix combinations
     const regularEntries = Object.entries(matrixConfig).filter(([key]) => key !== 'include');
     if (regularEntries.length > 0) {
@@ -25794,13 +25794,13 @@ function generateMatrixCombinations(matrixConfig) {
             return arrays.reduce((acc, curr) => acc.flatMap((combo) => curr.map((item) => [...combo, item])), [[]]);
         };
         const baseCombinations = cartesian(...values);
-        combinations.push(...baseCombinations.map((combo) => {
+        combinations = baseCombinations.map((combo) => {
             const result = {};
             keys.forEach((key, index) => {
                 result[key] = String(combo[index]);
             });
             return result;
-        }));
+        });
     }
     // Handle includes
     if (matrixConfig.include) {
@@ -25817,62 +25817,49 @@ function generateMatrixCombinations(matrixConfig) {
         else if (Array.isArray(matrixConfig.include)) {
             includes = matrixConfig.include;
         }
-        // First, add the global includes (those without matching keys)
-        const globalIncludes = includes.filter(include => {
+        // Process each include entry in order
+        for (const include of includes) {
             const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
                 acc[key] = String(value);
                 return acc;
             }, {});
-            // Check if this include has any matching keys with existing combinations
-            return !combinations.some(combination => {
-                for (const key of Object.keys(stringifiedInclude)) {
-                    if (key in combination)
-                        return true;
-                }
-                return false;
-            });
-        });
-        // Add global includes as new combinations
-        globalIncludes.forEach(include => {
-            const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
-                acc[key] = String(value);
-                return acc;
-            }, {});
-            combinations.push(stringifiedInclude);
-        });
-        // Then process specific includes (those with matching keys)
-        const specificIncludes = includes.filter(include => !globalIncludes.includes(include));
-        for (const include of specificIncludes) {
-            const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
-                acc[key] = String(value);
-                return acc;
-            }, {});
-            // Find matching combinations
+            // If there are no combinations yet, just add the include
+            if (combinations.length === 0) {
+                combinations.push({ ...stringifiedInclude });
+                continue;
+            }
+            // Check if this include matches any existing combinations
             let matchFound = false;
-            const matchingCombinations = combinations.filter(combination => {
-                // Check if this combination matches all shared keys
+            const newCombinations = [];
+            for (const combination of combinations) {
+                let isMatch = true;
+                // Check if all shared keys match
                 for (const [key, value] of Object.entries(stringifiedInclude)) {
                     if (key in combination && combination[key] !== value) {
-                        return false;
+                        isMatch = false;
+                        break;
                     }
                 }
-                return true;
-            });
-            if (matchingCombinations.length > 0) {
-                matchFound = true;
-                // Enhance matching combinations
-                matchingCombinations.forEach(combination => {
+                if (isMatch) {
+                    matchFound = true;
+                    // Create a new combination with the include values
+                    const newCombination = { ...combination };
                     for (const [key, value] of Object.entries(stringifiedInclude)) {
-                        if (!(key in combination)) {
-                            combination[key] = value;
+                        if (!(key in newCombination)) {
+                            newCombination[key] = value;
                         }
                     }
-                });
+                    newCombinations.push(newCombination);
+                }
+                else {
+                    newCombinations.push(combination);
+                }
             }
             // If no matches found, add as new combination
             if (!matchFound) {
-                combinations.push({ ...stringifiedInclude });
+                newCombinations.push({ ...stringifiedInclude });
             }
+            combinations = newCombinations;
         }
     }
     return combinations;
@@ -25931,6 +25918,7 @@ async function executeSteps(steps, matrix) {
     }
     return outputs;
 }
+run();
 run();
 run();
 
