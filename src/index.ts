@@ -60,6 +60,7 @@ async function run(): Promise<void> {
     const matrixInput = core.getInput('matrix', { required: true });
     const stepsInput = core.getInput('steps', { required: true });
     const outputsInput = core.getInput('outputs', { required: false });
+    const maxParallel = parseInt(core.getInput('max-parallel', { required: false }) || '0');
 
     // Parse YAML inputs
     const matrixConfig = yaml.parse(matrixInput);
@@ -75,18 +76,34 @@ async function run(): Promise<void> {
     const combinations: MatrixCombination[] = generateMatrixCombinations(matrixConfig[0]);
     const results: any[] = [];
 
-    // Execute matrix combinations in parallel
-    const promises = combinations.map(async (combination) => {
-      try {
-        const result = await executeSteps(steps, combination);
-        results.push({ ...combination, ...result });
-      } catch (error) {
-        core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
-        throw error;
+    if (maxParallel === 1) {
+      // Execute sequentially
+      for (const combination of combinations) {
+        try {
+          const result = await executeSteps(steps, combination);
+          results.push({ ...combination, ...result });
+        } catch (error) {
+          core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
+          throw error;
+        }
       }
-    });
-
-    await Promise.all(promises);
+    } else {
+      // Execute in parallel with optional max concurrency
+      const batchSize = maxParallel > 1 ? maxParallel : combinations.length;
+      for (let i = 0; i < combinations.length; i += batchSize) {
+        const batch = combinations.slice(i, i + batchSize);
+        const promises = batch.map(async (combination) => {
+          try {
+            const result = await executeSteps(steps, combination);
+            results.push({ ...combination, ...result });
+          } catch (error) {
+            core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
+            throw error;
+          }
+        });
+        await Promise.all(promises);
+      }
+    }
 
     // Set the final output
     core.setOutput('json', JSON.stringify(results));

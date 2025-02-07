@@ -25717,6 +25717,7 @@ async function run() {
         const matrixInput = core.getInput('matrix', { required: true });
         const stepsInput = core.getInput('steps', { required: true });
         const outputsInput = core.getInput('outputs', { required: false });
+        const maxParallel = parseInt(core.getInput('max-parallel', { required: false }) || '0');
         // Parse YAML inputs
         const matrixConfig = yaml.parse(matrixInput);
         validateMatrixConfig(matrixConfig);
@@ -25728,18 +25729,37 @@ async function run() {
         // Generate matrix combinations
         const combinations = generateMatrixCombinations(matrixConfig[0]);
         const results = [];
-        // Execute matrix combinations in parallel
-        const promises = combinations.map(async (combination) => {
-            try {
-                const result = await executeSteps(steps, combination);
-                results.push({ ...combination, ...result });
+        if (maxParallel === 1) {
+            // Execute sequentially
+            for (const combination of combinations) {
+                try {
+                    const result = await executeSteps(steps, combination);
+                    results.push({ ...combination, ...result });
+                }
+                catch (error) {
+                    core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
+                    throw error;
+                }
             }
-            catch (error) {
-                core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
-                throw error;
+        }
+        else {
+            // Execute in parallel with optional max concurrency
+            const batchSize = maxParallel > 1 ? maxParallel : combinations.length;
+            for (let i = 0; i < combinations.length; i += batchSize) {
+                const batch = combinations.slice(i, i + batchSize);
+                const promises = batch.map(async (combination) => {
+                    try {
+                        const result = await executeSteps(steps, combination);
+                        results.push({ ...combination, ...result });
+                    }
+                    catch (error) {
+                        core.error(`Failed to execute combination ${JSON.stringify(combination)}: ${error}`);
+                        throw error;
+                    }
+                });
+                await Promise.all(promises);
             }
-        });
-        await Promise.all(promises);
+        }
         // Set the final output
         core.setOutput('json', JSON.stringify(results));
     }
