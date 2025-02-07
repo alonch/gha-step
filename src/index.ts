@@ -185,14 +185,15 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
         continue;
       }
 
-      // Check if this include should modify existing combinations or create a new one
-      let shouldAddNew = true;
-      const newCombinations: MatrixCombination[] = [];
+      let matchFound = false;
+      const combinationsToAdd: MatrixCombination[] = [];
 
-      // Try to add to existing combinations
-      combinations.forEach(combination => {
+      // Try to enhance existing combinations
+      for (let i = 0; i < combinations.length; i++) {
+        const combination = combinations[i];
         let canEnhance = true;
-        // Check if this combination can be enhanced with the include
+
+        // Check if this combination can be enhanced
         for (const [key, value] of Object.entries(stringifiedInclude)) {
           if (key in combination && combination[key] !== value) {
             canEnhance = false;
@@ -201,25 +202,22 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
         }
 
         if (canEnhance) {
-          shouldAddNew = false;
-          // Create a new combination with the include values
+          matchFound = true;
+          // Create enhanced combination
           const enhanced = { ...combination };
           for (const [key, value] of Object.entries(stringifiedInclude)) {
             if (!(key in enhanced)) {
               enhanced[key] = value;
             }
           }
-          newCombinations.push(enhanced);
+          // Replace the original combination with the enhanced one
+          combinations[i] = enhanced;
         }
-      });
+      }
 
-      if (shouldAddNew) {
-        // Add as a new combination if it couldn't enhance any existing ones
+      // If no matches found, add as new combination
+      if (!matchFound) {
         combinations.push({ ...stringifiedInclude });
-      } else {
-        // Replace existing combinations with enhanced ones
-        combinations.length = 0;
-        combinations.push(...newCombinations);
       }
     }
   }
