@@ -5,6 +5,9 @@ This action allows you to run steps in parallel using a matrix strategy, similar
 ## Features
 
 - Run steps in parallel using matrix combinations
+- Powerful matrix include system for extending and customizing combinations
+- Conditional matrix value additions based on existing combinations
+- Create standalone matrix entries for special cases
 - Pass outputs between steps
 - Access matrix values as environment variables
 - Collect and combine outputs from all matrix executions
@@ -58,6 +61,39 @@ Example:
 ```yaml
 - os: [ubuntu, macos]
   version: [20.04, 22.04]
+```
+
+#### Matrix Include
+Use `include` to expand existing matrix configurations or add new combinations. The value of `include` is a list of objects that follows these rules:
+
+1. For each object in the include list:
+   - Key-value pairs are added to each matrix combination if they don't overwrite existing values
+   - If an object can't be added to any existing combination without overwriting values, it creates a new combination
+   - Original matrix values are preserved, but added values can be overwritten by subsequent includes
+
+Example with includes:
+```yaml
+matrix: |
+  - os: [windows-latest, ubuntu-latest]
+    node: [14, 16]
+    include:
+      - color: green          # Added to all combinations
+      - os: windows-latest    # Adds npm only to windows + node 16
+        node: 16
+        npm: 6
+      - os: macos            # Creates new standalone combination
+        node: 18
+```
+
+This results in:
+```json
+[
+  {"os": "windows-latest", "node": "14", "color": "green"},
+  {"os": "windows-latest", "node": "16", "npm": "6", "color": "green"},
+  {"os": "ubuntu-latest", "node": "14", "color": "green"},
+  {"os": "ubuntu-latest", "node": "16", "color": "green"},
+  {"os": "macos", "node": "18"}
+]
 ```
 
 ### steps
@@ -119,7 +155,6 @@ Indicates the overall execution status:
 - `failure`: One or more combinations failed
 - `cancelled`: The workflow was cancelled during execution
 
-
 ## License
 
-MIT 
+MIT
