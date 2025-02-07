@@ -174,40 +174,43 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
 
     // Process each include entry
     for (const include of includes) {
+      const stringifiedInclude = Object.entries(include).reduce((acc, [key, value]) => {
+        acc[key] = String(value);
+        return acc;
+      }, {} as MatrixCombination);
+
       if (combinations.length === 0) {
         // If no base combinations, add include as a new combination
-        combinations.push(Object.entries(include).reduce((acc, [key, value]) => {
-          acc[key] = String(value);
-          return acc;
-        }, {} as MatrixCombination));
+        combinations.push(stringifiedInclude);
       } else {
-        // Add include properties to matching combinations or create new ones
-        let added = false;
-        const includeEntries = Object.entries(include);
+        // Find matching combinations to modify
+        let matchFound = false;
+        const includeKeys = Object.keys(stringifiedInclude);
         
-        // Try to add to existing combinations
+        // Try to add to existing combinations that match all specified keys
         combinations.forEach(combination => {
-          let canAdd = true;
-          for (const [key, value] of includeEntries) {
-            if (key in combination && combination[key] !== String(value)) {
-              canAdd = false;
+          let isMatch = true;
+          for (const key of includeKeys) {
+            if (key in combination && combination[key] !== stringifiedInclude[key]) {
+              isMatch = false;
               break;
             }
           }
-          if (canAdd) {
-            added = true;
-            for (const [key, value] of includeEntries) {
-              combination[key] = String(value);
+          
+          if (isMatch) {
+            matchFound = true;
+            // Add new properties without overwriting existing ones
+            for (const [key, value] of Object.entries(stringifiedInclude)) {
+              if (!(key in combination)) {
+                combination[key] = value;
+              }
             }
           }
         });
 
-        // If couldn't add to any existing combination, create a new one
-        if (!added) {
-          combinations.push(Object.entries(include).reduce((acc, [key, value]) => {
-            acc[key] = String(value);
-            return acc;
-          }, {} as MatrixCombination));
+        // If no matches found, add as new combination
+        if (!matchFound) {
+          combinations.push(stringifiedInclude);
         }
       }
     }
