@@ -24,7 +24,7 @@ interface ProcessEnv {
   [key: string]: string;
 }
 
-function validateMatrixConfig(config: any): asserts config is { [key: string]: string[] }[] {
+function validateMatrixConfig(config: any): asserts config is { [key: string]: string[] | any[] }[] {
   if (!Array.isArray(config)) {
     throw new Error('Matrix configuration must be an array');
   }
@@ -39,17 +39,30 @@ function validateMatrixConfig(config: any): asserts config is { [key: string]: s
     }
 
     Object.entries(entry).forEach(([key, value]) => {
-      if (!Array.isArray(value)) {
-        throw new Error(`Matrix entry "${key}" must be an array`);
-      }
-      if (value.length === 0) {
-        throw new Error(`Matrix entry "${key}" cannot be empty`);
-      }
-      value.forEach((item, itemIndex) => {
-        if (typeof item !== 'string' && typeof item !== 'number') {
-          throw new Error(`Value at index ${itemIndex} in matrix entry "${key}" must be a string or number`);
+      if (key === 'include') {
+        if (!Array.isArray(value) && typeof value !== 'string') {
+          throw new Error('Matrix include must be an array or a JSON string');
         }
-      });
+        if (Array.isArray(value)) {
+          value.forEach((item, itemIndex) => {
+            if (typeof item !== 'object' || item === null) {
+              throw new Error(`Include item at index ${itemIndex} must be an object`);
+            }
+          });
+        }
+      } else {
+        if (!Array.isArray(value)) {
+          throw new Error(`Matrix entry "${key}" must be an array`);
+        }
+        if (value.length === 0) {
+          throw new Error(`Matrix entry "${key}" cannot be empty`);
+        }
+        value.forEach((item, itemIndex) => {
+          if (typeof item !== 'string' && typeof item !== 'number') {
+            throw new Error(`Value at index ${itemIndex} in matrix entry "${key}" must be a string or number`);
+          }
+        });
+      }
     });
   });
 }
