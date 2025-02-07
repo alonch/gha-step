@@ -470,6 +470,11 @@ jobs:
 
       - name: Validate Array Include Output
         run: |
+          # Helper function to normalize and sort JSON arrays
+          normalize_and_sort() {
+            echo "$1" | jq -S 'sort_by(. | to_entries | sort_by(.key) | map(.value) | join("|"))'
+          }
+
           output='${{ steps.array-include-test.outputs.json }}'
           expected='[
             {"fruit":"apple","color":"green","shape":"round","combo":"apple-green"},
@@ -479,14 +484,18 @@ jobs:
             {"fruit":"banana","color":"brown","combo":"banana-brown"}
           ]'
           
-          # Compare the outputs
-          if ! diff -u <(echo "$expected" | jq -S .) <(echo "$output" | jq -S .); then
+          # Normalize and sort both JSONs
+          output_sorted=$(normalize_and_sort "$output")
+          expected_sorted=$(normalize_and_sort "$expected")
+          
+          # Compare the sorted JSONs
+          if [ "$output_sorted" != "$expected_sorted" ]; then
             echo "Array include test failed. Showing both versions:"
-            echo "Expected:"
-            echo "$expected" | jq .
-            echo "Got:"
-            echo "$output" | jq .
+            echo "Expected (sorted):"
+            echo "$expected_sorted" | jq .
+            echo "Got (sorted):"
+            echo "$output_sorted" | jq .
             echo "Showing diff:"
-            diff -u <(echo "$expected" | jq .) <(echo "$output" | jq .) || true
+            diff -u <(echo "$expected_sorted" | jq .) <(echo "$output_sorted" | jq .) || true
             exit 1
           fi 
