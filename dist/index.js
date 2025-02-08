@@ -25981,57 +25981,64 @@ async function executeSteps(steps, matrix) {
             const stepDescription = `Step "${step.name}" (${step.id}) - Matrix: ${JSON.stringify(matrix)}`;
             let stepFailed = false;
             let failureError;
-            let stepOutputsContent = '';
-            await core.group(stepDescription, async () => {
-                const { stdout, stderr, exitCode } = await exec.getExecOutput('bash', ['-c', step.run], {
-                    env,
-                    silent: true, // Silent because we'll handle the output ourselves
-                    ignoreReturnCode: true // We'll handle the error ourselves
-                });
-                // Print stdout if present
-                if (stdout.trim()) {
-                    core.info('\nStandard Output:');
-                    core.info('---------------');
-                    core.info(stdout.trim());
-                    core.info(''); // Add empty line for better readability
-                }
-                // Print stderr if present
-                if (stderr.trim()) {
-                    core.info('\nStandard Error:');
-                    core.info('--------------');
-                    core.info(stderr.trim());
-                    core.info(''); // Add empty line for better readability
-                }
-                // If the command failed (non-zero exit code), mark as failed but continue to read outputs
-                if (exitCode !== 0) {
-                    stepFailed = true;
-                    failureError = new Error(`Step failed with exit code ${exitCode}`);
-                }
-                // Try to read outputs even if the step failed
-                try {
-                    const { stdout: outputStdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
-                    stepOutputsContent = outputStdout;
-                    // Only show outputs section if there are outputs
-                    if (outputStdout.trim()) {
-                        core.info('\nStep Outputs:');
-                        core.info('-------------');
-                        core.info(outputStdout.trim());
-                        core.info(''); // Add empty line for better readability
-                    }
-                    // Parse and store outputs even if the step failed
-                    const currentStepOutputs = (0, steps_1.collectStepOutputs)(outputStdout.split('\n'));
-                    Object.assign(outputs, currentStepOutputs);
-                    stepOutputs[step.id] = currentStepOutputs;
-                    // Clear outputs file
-                    await exec.exec('rm', [env.STEPS_OUTPUTS], { silent: true });
-                }
-                catch (error) {
-                    // Only warn about missing outputs if the step didn't fail
-                    if (!stepFailed) {
-                        core.warning(`No outputs found for step ${step.id}`);
-                    }
-                }
+            let outputBuffer = [];
+            // Collect all outputs before starting the group
+            const { stdout, stderr, exitCode } = await exec.getExecOutput('bash', ['-c', step.run], {
+                env,
+                silent: true, // Silent because we'll handle the output ourselves
+                ignoreReturnCode: true // We'll handle the error ourselves
             });
+            // If the command failed (non-zero exit code), mark as failed but continue to read outputs
+            if (exitCode !== 0) {
+                stepFailed = true;
+                failureError = new Error(`Step failed with exit code ${exitCode}`);
+            }
+            // Collect stdout if present
+            if (stdout.trim()) {
+                outputBuffer.push('\nStandard Output:');
+                outputBuffer.push('---------------');
+                outputBuffer.push(stdout.trim());
+                outputBuffer.push(''); // Add empty line for better readability
+            }
+            // Collect stderr if present
+            if (stderr.trim()) {
+                outputBuffer.push('\nStandard Error:');
+                outputBuffer.push('--------------');
+                outputBuffer.push(stderr.trim());
+                outputBuffer.push(''); // Add empty line for better readability
+            }
+            // Try to read step outputs
+            try {
+                const { stdout: outputStdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+                // Only add outputs section if there are outputs
+                if (outputStdout.trim()) {
+                    outputBuffer.push('\nStep Outputs:');
+                    outputBuffer.push('-------------');
+                    outputBuffer.push(outputStdout.trim());
+                    outputBuffer.push(''); // Add empty line for better readability
+                }
+                // Parse and store outputs even if the step failed
+                const currentStepOutputs = (0, steps_1.collectStepOutputs)(outputStdout.split('\n'));
+                Object.assign(outputs, currentStepOutputs);
+                stepOutputs[step.id] = currentStepOutputs;
+                // Clear outputs file
+                await exec.exec('rm', [env.STEPS_OUTPUTS], { silent: true });
+            }
+            catch (error) {
+                // Only warn about missing outputs if the step didn't fail
+                if (!stepFailed) {
+                    core.warning(`No outputs found for step ${step.id}`);
+                }
+            }
+            // Now that we have all output, start the group and print everything
+            core.startGroup(stepDescription);
+            try {
+                // Print all collected output
+                outputBuffer.forEach(line => core.info(line));
+            }
+            finally {
+                core.endGroup();
+            }
             // Now throw the error if the step failed
             if (stepFailed && failureError) {
                 throw failureError;

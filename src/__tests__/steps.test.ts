@@ -8,6 +8,8 @@ jest.mock('@actions/core', () => ({
   error: jest.fn(),
   group: jest.fn((name, fn) => fn()),
   setFailed: jest.fn(),
+  startGroup: jest.fn(),
+  endGroup: jest.fn(),
 }));
 
 // Mock @actions/exec
