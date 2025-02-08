@@ -364,6 +364,7 @@ export async function executeSteps(steps: StepDefinition[], matrix: MatrixCombin
       const stepDescription = `Step "${step.name}" (${step.id}) - Matrix: ${JSON.stringify(matrix)}`;
       let stepFailed = false;
       let failureError: Error | undefined;
+      let stepOutputsContent = '';
 
       await core.group(stepDescription, async () => {
         const { stdout, stderr, exitCode } = await exec.getExecOutput('bash', ['-c', step.run], { 
@@ -393,35 +394,34 @@ export async function executeSteps(steps: StepDefinition[], matrix: MatrixCombin
           stepFailed = true;
           failureError = new Error(`Step failed with exit code ${exitCode}`);
         }
-      });
 
-      // Try to read outputs even if the step failed
-      try {
-        const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
-        
-        // Only create output group if there are outputs
-        if (stdout.trim()) {
-          await core.group(`Outputs from step ${step.id} (${uniqueId})`, async () => {
+        // Try to read outputs even if the step failed
+        try {
+          const { stdout: outputStdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+          stepOutputsContent = outputStdout;
+          
+          // Only show outputs section if there are outputs
+          if (outputStdout.trim()) {
             core.info('\nStep Outputs:');
             core.info('-------------');
-            core.info(stdout.trim());
+            core.info(outputStdout.trim());
             core.info(''); // Add empty line for better readability
-          });
-        }
+          }
 
-        // Parse and store outputs even if the step failed
-        const currentStepOutputs = collectStepOutputs(stdout.split('\n'));
-        Object.assign(outputs, currentStepOutputs);
-        stepOutputs[step.id] = currentStepOutputs;
+          // Parse and store outputs even if the step failed
+          const currentStepOutputs = collectStepOutputs(outputStdout.split('\n'));
+          Object.assign(outputs, currentStepOutputs);
+          stepOutputs[step.id] = currentStepOutputs;
 
-        // Clear outputs file
-        await exec.exec('rm', [env.STEPS_OUTPUTS], { silent: true });
-      } catch (error) {
-        // Only warn about missing outputs if the step didn't fail
-        if (!stepFailed) {
-          core.warning(`No outputs found for step ${step.id}`);
+          // Clear outputs file
+          await exec.exec('rm', [env.STEPS_OUTPUTS], { silent: true });
+        } catch (error) {
+          // Only warn about missing outputs if the step didn't fail
+          if (!stepFailed) {
+            core.warning(`No outputs found for step ${step.id}`);
+          }
         }
-      }
+      });
 
       // Now throw the error if the step failed
       if (stepFailed && failureError) {
