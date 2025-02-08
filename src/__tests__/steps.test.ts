@@ -1,4 +1,24 @@
 import { collectStepOutputs } from '../steps';
+import { executeSteps } from '../index';
+
+// Mock @actions/core
+jest.mock('@actions/core', () => ({
+  info: jest.fn(),
+  warning: jest.fn(),
+  error: jest.fn(),
+  group: jest.fn((name, fn) => fn()),
+  setFailed: jest.fn(),
+}));
+
+// Mock @actions/exec
+jest.mock('@actions/exec', () => ({
+  exec: jest.fn(),
+  getExecOutput: jest.fn(),
+}));
+
+// Get the mocked modules
+import * as core from '@actions/core';
+import * as exec from '@actions/exec';
 
 describe('collectStepOutputs', () => {
   it('should collect single value outputs', () => {
@@ -209,5 +229,169 @@ describe('collectStepOutputs', () => {
       tags: ['v1.0', 'latest', 'stable'],
       arch: 'x64'
     });
+  });
+});
+
+describe('executeSteps', () => {
+  beforeEach(() => {
+    // Clear all mocks before each test
+    jest.clearAllMocks();
+    
+    // Reset mock implementations
+    (exec.getExecOutput as jest.Mock).mockReset();
+    (exec.exec as jest.Mock).mockReset();
+    (core.info as jest.Mock).mockReset();
+    (core.warning as jest.Mock).mockReset();
+    (core.error as jest.Mock).mockReset();
+    (core.group as jest.Mock).mockReset().mockImplementation((name, fn) => fn());
+  });
+
+  it('should handle successful step execution', async () => {
+    // Mock successful execution
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ stdout: 'Step output', stderr: '', exitCode: 0 }) // Step execution
+      .mockResolvedValueOnce({ stdout: 'key=value', stderr: '', exitCode: 0 }); // Reading outputs
+    
+    (exec.exec as jest.Mock).mockResolvedValue(0); // For rm command
+
+    const steps = [{
+      name: 'Test Step',
+      id: 'test',
+      run: 'echo "test"'
+    }];
+
+    const matrix = { test: '1' };
+    
+    const result = await executeSteps(steps, matrix);
+    
+    // Verify outputs were collected
+    expect(result).toEqual({ key: 'value' });
+    
+    // Verify proper formatting
+    expect(core.info).toHaveBeenCalledWith('\nStandard Output:');
+    expect(core.info).toHaveBeenCalledWith('---------------');
+    expect(core.info).toHaveBeenCalledWith('Step output');
+    expect(core.info).toHaveBeenCalledWith('');
+  });
+
+  it('should handle step failure but still collect outputs', async () => {
+    // Mock failed execution but with outputs
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ stdout: 'Step output', stderr: 'Error output', exitCode: 1 }) // Step execution
+      .mockResolvedValueOnce({ stdout: 'key=value', stderr: '', exitCode: 0 }); // Reading outputs
+    
+    (exec.exec as jest.Mock).mockResolvedValue(0); // For rm command
+
+    const steps = [{
+      name: 'Test Step',
+      id: 'test',
+      run: 'exit 1'
+    }];
+
+    const matrix = { test: '2' };
+    
+    // Expect the step to throw
+    await expect(executeSteps(steps, matrix)).rejects.toThrow('Step failed with exit code 1');
+    
+    // Verify error was logged
+    expect(core.error).toHaveBeenCalledWith(expect.stringContaining('Step test failed'));
+    
+    // Verify outputs were still collected before throwing
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('key=value'));
+  });
+
+  it('should handle step failure with no outputs', async () => {
+    // Mock failed execution with no outputs
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ stdout: '', stderr: 'Error output', exitCode: 1 }) // Step execution
+      .mockRejectedValueOnce(new Error('No such file')); // Reading outputs fails
+
+    const steps = [{
+      name: 'Test Step',
+      id: 'test',
+      run: 'exit 1'
+    }];
+
+    const matrix = { test: '2' };
+    
+    // Expect the step to throw
+    await expect(executeSteps(steps, matrix)).rejects.toThrow('Step failed with exit code 1');
+    
+    // Verify error was logged
+    expect(core.error).toHaveBeenCalledWith(expect.stringContaining('Step test failed'));
+    
+    // Verify no "No outputs found" warning when step failed
+    expect(core.warning).not.toHaveBeenCalled();
+  });
+
+  it('should handle successful step with no outputs', async () => {
+    // Mock successful execution but no outputs
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ stdout: 'Step output', stderr: '', exitCode: 0 }) // Step execution
+      .mockRejectedValueOnce(new Error('No such file')); // Reading outputs fails
+
+    const steps = [{
+      name: 'Test Step',
+      id: 'test',
+      run: 'echo "test"'
+    }];
+
+    const matrix = { test: '1' };
+    
+    const result = await executeSteps(steps, matrix);
+    
+    // Verify empty outputs
+    expect(result).toEqual({});
+    
+    // Verify warning was shown for missing outputs
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('No outputs found'));
+  });
+
+  it('should format output groups correctly', async () => {
+    // Mock successful execution with various outputs
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ 
+        stdout: 'Normal output\nMore output', 
+        stderr: 'Warning message', 
+        exitCode: 0 
+      }) // Step execution
+      .mockResolvedValueOnce({ 
+        stdout: 'key1=value1\nkey2=value2', 
+        stderr: '', 
+        exitCode: 0 
+      }); // Reading outputs
+    
+    (exec.exec as jest.Mock).mockResolvedValue(0); // For rm command
+
+    const steps = [{
+      name: 'Test Step',
+      id: 'test',
+      run: 'echo "test"'
+    }];
+
+    const matrix = { test: '1' };
+    
+    await executeSteps(steps, matrix);
+    
+    // Verify group formatting
+    const infoCallArgs = (core.info as jest.Mock).mock.calls.map(call => call[0]);
+    
+    // Verify stdout formatting
+    expect(infoCallArgs).toContain('\nStandard Output:');
+    expect(infoCallArgs).toContain('---------------');
+    expect(infoCallArgs).toContain('Normal output\nMore output');
+    expect(infoCallArgs).toContain('');
+    
+    // Verify stderr formatting
+    expect(infoCallArgs).toContain('\nStandard Error:');
+    expect(infoCallArgs).toContain('--------------');
+    expect(infoCallArgs).toContain('Warning message');
+    expect(infoCallArgs).toContain('');
+    
+    // Verify outputs formatting
+    expect(infoCallArgs).toContain('\nStep Outputs:');
+    expect(infoCallArgs).toContain('-------------');
+    expect(infoCallArgs).toContain('key1=value1\nkey2=value2');
+    expect(infoCallArgs).toContain('');
   });
 }); 

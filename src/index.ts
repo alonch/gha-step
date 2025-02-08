@@ -320,7 +320,7 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
   return combinations;
 }
 
-async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination): Promise<StepOutputs> {
+export async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination): Promise<StepOutputs> {
   const outputs: StepOutputs = {};
   const stepOutputs: { [stepId: string]: StepOutputs } = {};
   
