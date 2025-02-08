@@ -25988,15 +25988,17 @@ async function executeSteps(steps, matrix) {
                 });
                 // Print stdout if present
                 if (stdout.trim()) {
-                    core.info('Standard Output:');
+                    core.info('\nStandard Output:');
                     core.info('---------------');
                     core.info(stdout.trim());
+                    core.info(''); // Add empty line for better readability
                 }
                 // Print stderr if present
                 if (stderr.trim()) {
                     core.info('\nStandard Error:');
                     core.info('--------------');
                     core.info(stderr.trim());
+                    core.info(''); // Add empty line for better readability
                 }
                 // If the command failed (non-zero exit code), mark as failed but continue to read outputs
                 if (exitCode !== 0) {
@@ -26006,17 +26008,18 @@ async function executeSteps(steps, matrix) {
             });
             // Try to read outputs even if the step failed
             try {
-                const outputContent = await core.group(`Outputs from step ${step.id} (${uniqueId})`, async () => {
-                    const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
-                    if (stdout.trim()) {
-                        core.info('Step Outputs:');
+                const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+                // Only create output group if there are outputs
+                if (stdout.trim()) {
+                    await core.group(`Outputs from step ${step.id} (${uniqueId})`, async () => {
+                        core.info('\nStep Outputs:');
                         core.info('-------------');
                         core.info(stdout.trim());
-                    }
-                    return stdout;
-                });
+                        core.info(''); // Add empty line for better readability
+                    });
+                }
                 // Parse and store outputs even if the step failed
-                const currentStepOutputs = (0, steps_1.collectStepOutputs)(outputContent.split('\n'));
+                const currentStepOutputs = (0, steps_1.collectStepOutputs)(stdout.split('\n'));
                 Object.assign(outputs, currentStepOutputs);
                 stepOutputs[step.id] = currentStepOutputs;
                 // Clear outputs file
