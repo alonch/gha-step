@@ -25942,9 +25942,13 @@ function generateMatrixCombinations(matrixConfig) {
 async function executeSteps(steps, matrix) {
     const outputs = {};
     const stepOutputs = {};
+    // Generate a unique identifier for this execution
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(7);
+    const uniqueId = `${timestamp}-${randomStr}`;
     const env = {
         ...process.env,
-        STEPS_OUTPUTS: `steps-outputs-${Object.values(matrix).join('-')}.env`,
+        STEPS_OUTPUTS: `steps-outputs-${uniqueId}.env`,
     };
     // Add matrix values as environment variables
     Object.entries(matrix).forEach(([key, value]) => {
@@ -25973,11 +25977,11 @@ async function executeSteps(steps, matrix) {
         });
         try {
             // Execute step
-            await exec.exec('bash', ['-c', step.run], { env, silent: true });
+            await exec.exec('bash', ['-c', step.run], { env, silent: false });
             // Read step outputs
             try {
                 const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
-                    const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+                    const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: false });
                     return stdout;
                 });
                 // Parse outputs using our new collectStepOutputs function
@@ -25999,8 +26003,6 @@ async function executeSteps(steps, matrix) {
     }
     return outputs;
 }
-run();
-run();
 run();
 
 

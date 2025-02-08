@@ -323,9 +323,15 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
 async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination): Promise<StepOutputs> {
   const outputs: StepOutputs = {};
   const stepOutputs: { [stepId: string]: StepOutputs } = {};
+  
+  // Generate a unique identifier for this execution
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(7);
+  const uniqueId = `${timestamp}-${randomStr}`;
+  
   const env: ProcessEnv = {
     ...process.env as ProcessEnv,
-    STEPS_OUTPUTS: `steps-outputs-${Object.values(matrix).join('-')}.env`,
+    STEPS_OUTPUTS: `steps-outputs-${uniqueId}.env`,
   };
 
   // Add matrix values as environment variables

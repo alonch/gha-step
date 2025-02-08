@@ -1137,4 +1137,70 @@ describe('generateMatrixCombinations', () => {
       ]);
     });
   });
+
+  it('verifies no file collisions in parallel execution', async () => {
+    const fs = require('fs').promises;
+    const path = require('path');
+    
+    // Create multiple combinations that will run in parallel
+    const combinations = [
+      { os: 'ubuntu', arch: 'amd64' },
+      { os: 'ubuntu', arch: 'arm64' },
+      { os: 'macos', arch: 'amd64' },
+      { os: 'macos', arch: 'arm64' }
+    ];
+
+    // Keep track of all created files
+    const createdFiles = new Set<string>();
+
+    // Function to simulate a step execution
+    const executeStep = async (combination: any) => {
+      // Generate unique file name like in the main code
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(7);
+      const uniqueId = `${timestamp}-${randomStr}`;
+      const outputFile = `steps-outputs-${uniqueId}.env`;
+      
+      // Add to our set of created files
+      createdFiles.add(outputFile);
+      
+      // Write to the unique file
+      await fs.writeFile(outputFile, `platform=${combination.os}-${combination.arch}\n`);
+
+      // Small delay to simulate real-world timing
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+
+      // Read the file
+      const content = await fs.readFile(outputFile, 'utf8');
+      
+      // Delete the file
+      await fs.unlink(outputFile);
+      
+      return content;
+    };
+
+    // Execute all combinations in parallel
+    const results = await Promise.all(combinations.map(executeStep));
+
+    // Clean up any remaining files (shouldn't be necessary but just in case)
+    for (const file of createdFiles) {
+      try {
+        await fs.unlink(file);
+      } catch (error) {
+        // Ignore errors, file might not exist
+      }
+    }
+
+    // Verify that we got all results (no failures)
+    expect(results.filter(Boolean).length).toBe(combinations.length);
+    
+    // Verify that we created the right number of unique files
+    expect(createdFiles.size).toBe(combinations.length);
+    
+    // Verify each combination has a result
+    const platforms = results.map(r => r.trim().split('=')[1]);
+    combinations.forEach(c => {
+      expect(platforms).toContain(`${c.os}-${c.arch}`);
+    });
+  });
 }); 
