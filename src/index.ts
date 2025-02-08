@@ -361,12 +361,43 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
 
     try {
       // Execute step
-      await exec.exec('bash', ['-c', step.run], { env, silent: false });
+      const stepDescription = `Step "${step.name}" (${step.id}) - Matrix: ${JSON.stringify(matrix)}`;
+      await core.group(stepDescription, async () => {
+        const { stdout, stderr } = await exec.getExecOutput('bash', ['-c', step.run], { 
+          env, 
+          silent: true, // Silent because we'll handle the output ourselves
+          ignoreReturnCode: true // We'll handle the error ourselves
+        });
+
+        // Print stdout if present
+        if (stdout.trim()) {
+          core.info('Standard Output:');
+          core.info('---------------');
+          core.info(stdout.trim());
+        }
+
+        // Print stderr if present
+        if (stderr.trim()) {
+          core.info('\nStandard Error:');
+          core.info('--------------');
+          core.info(stderr.trim());
+        }
+
+        // If the command failed, throw the error
+        if (stderr.trim()) {
+          throw new Error(`Step failed with error output`);
+        }
+      });
 
       // Read step outputs
       try {
-        const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
-          const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: false });
+        const outputContent = await core.group(`Outputs from step ${step.id} (${uniqueId})`, async () => {
+          const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+          if (stdout.trim()) {
+            core.info('Step Outputs:');
+            core.info('-------------');
+            core.info(stdout.trim());
+          }
           return stdout;
         });
 
@@ -378,7 +409,7 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
         stepOutputs[step.id] = currentStepOutputs;
 
         // Clear outputs file
-        await exec.exec('rm', [env.STEPS_OUTPUTS]);
+        await exec.exec('rm', [env.STEPS_OUTPUTS], { silent: true });
       } catch (error) {
         core.warning(`No outputs found for step ${step.id}`);
       }
