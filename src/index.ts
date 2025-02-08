@@ -360,7 +360,7 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
       // Read step outputs
       try {
         const outputContent = await core.group(`Reading outputs for step ${step.id}`, async () => {
-          const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
+          const { stdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: false });
           return stdout;
         });
 
@@ -385,6 +385,4 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
   return outputs;
 }
 
-run();
-run();
 run();

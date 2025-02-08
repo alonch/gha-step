@@ -1020,5 +1020,121 @@ describe('generateMatrixCombinations', () => {
       // Arrays from step outputs should remain as arrays
       expect(parsed[0].tags).toEqual(['v1.0', 'latest', 'stable']);
     });
+
+    it('should handle conflicts between matrix inputs and step outputs', () => {
+      const input = {
+        include: [
+          { 
+            fruit: 'apple',
+            color: 'red'
+          }
+        ]
+      };
+
+      // Simulate step output overriding matrix input
+      const result = generateMatrixCombinations(input);
+      const withStepOutputs = result.map(item => ({
+        ...item,
+        fruit: 'banana'  // Step output trying to override matrix input
+      }));
+
+      // Verify the output structure
+      expect(withStepOutputs).toEqual([
+        { fruit: 'banana', color: 'red' }  // Step output takes precedence
+      ]);
+
+      // Simulate the output.json format
+      const outputJson = JSON.stringify(withStepOutputs);
+      const parsed = JSON.parse(outputJson);
+
+      // Verify the structure after serialization
+      expect(parsed).toEqual([
+        { fruit: 'banana', color: 'red' }  // Step output value persists
+      ]);
+    });
+
+    it('should handle multiple output conflicts with matrix inputs', () => {
+      const input = {
+        include: [
+          { 
+            fruit: 'apple',
+            color: 'red',
+            shape: 'round'
+          }
+        ]
+      };
+
+      // Simulate multiple step outputs conflicting with matrix inputs
+      const result = generateMatrixCombinations(input);
+      const withStepOutputs = result.map(item => ({
+        ...item,
+        fruit: 'banana',     // Override fruit
+        color: 'yellow',     // Override color
+        extra: 'additional'  // New output
+      }));
+
+      // Verify the output structure
+      expect(withStepOutputs).toEqual([
+        { 
+          fruit: 'banana',     // Step output overrides
+          color: 'yellow',     // Step output overrides
+          shape: 'round',      // Original matrix value preserved
+          extra: 'additional'  // New step output added
+        }
+      ]);
+
+      // Simulate the output.json format
+      const outputJson = JSON.stringify(withStepOutputs);
+      const parsed = JSON.parse(outputJson);
+
+      // Verify the structure after serialization
+      expect(parsed).toEqual([
+        { 
+          fruit: 'banana',     // Step output value persists
+          color: 'yellow',     // Step output value persists
+          shape: 'round',      // Original matrix value preserved
+          extra: 'additional'  // New step output preserved
+        }
+      ]);
+    });
+
+    it('should handle array output conflicts with matrix inputs', () => {
+      const input = {
+        include: [
+          { 
+            fruit: 'apple',
+            tags: ['v1']
+          }
+        ]
+      };
+
+      // Simulate array step output conflicting with matrix input
+      const result = generateMatrixCombinations(input);
+      const withStepOutputs = result.map(item => ({
+        ...item,
+        fruit: ['banana', 'orange'],  // Array output trying to override scalar input
+        tags: ['v2', 'latest']        // Array output overriding array input
+      }));
+
+      // Verify the output structure
+      expect(withStepOutputs).toEqual([
+        { 
+          fruit: ['banana', 'orange'],  // Array output overrides scalar input
+          tags: ['v2', 'latest']        // Array output overrides array input
+        }
+      ]);
+
+      // Simulate the output.json format
+      const outputJson = JSON.stringify(withStepOutputs);
+      const parsed = JSON.parse(outputJson);
+
+      // Verify the structure after serialization
+      expect(parsed).toEqual([
+        { 
+          fruit: ['banana', 'orange'],  // Array structure preserved
+          tags: ['v2', 'latest']        // Array structure preserved
+        }
+      ]);
+    });
   });
 }); 

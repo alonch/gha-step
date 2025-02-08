@@ -498,4 +498,40 @@ jobs:
             echo "Showing diff:"
             diff -u <(echo "$expected_sorted" | jq .) <(echo "$output_sorted" | jq .) || true
             exit 1
+          fi
+
+      - name: Test Output Overrides
+        id: override-test
+        uses: ./
+        with:
+          matrix: |
+            - fruit: apple
+              color: red
+          steps: |
+            - name: Override Values
+              id: override
+              run: |
+                # Override existing matrix value
+                echo "fruit=banana" >> $STEPS_OUTPUTS
+                # Add new output
+                echo "shape=round" >> $STEPS_OUTPUTS
+          outputs: |
+            - fruit: ${ STEPS_OVERRIDE_FRUIT }
+            - shape: ${ STEPS_OVERRIDE_SHAPE }
+
+      - name: Validate Output Overrides
+        run: |
+          output='${{ steps.override-test.outputs.json }}'
+          expected='[{"fruit":"banana","color":"red","shape":"round"}]'
+          
+          # Compare the outputs
+          if [ "$(echo "$output" | jq -S .)" != "$(echo "$expected" | jq -S .)" ]; then
+            echo "Output override test failed. Showing both versions:"
+            echo "Expected:"
+            echo "$expected" | jq .
+            echo "Got:"
+            echo "$output" | jq .
+            echo "Showing diff:"
+            diff -u <(echo "$expected" | jq .) <(echo "$output" | jq .) || true
+            exit 1
           fi 
