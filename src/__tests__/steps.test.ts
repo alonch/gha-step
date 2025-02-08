@@ -394,4 +394,97 @@ describe('executeSteps', () => {
     expect(infoCallArgs).toContain('key1=value1\nkey2=value2');
     expect(infoCallArgs).toContain('');
   });
+
+  it('should format error messages correctly for step failures', async () => {
+    // Mock failed execution
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ stdout: '', stderr: 'Command failed', exitCode: 1 }) // Step execution
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // Reading outputs (empty)
+    
+    (exec.exec as jest.Mock).mockResolvedValue(0); // For rm command
+
+    const steps = [{
+      name: 'Fail Step',
+      id: 'fail',
+      run: 'exit 1'
+    }];
+
+    const matrix = { test: '1' };
+    
+    // Expect the step to throw with correct error message
+    await expect(executeSteps(steps, matrix)).rejects.toThrow('Step failed with exit code 1');
+    
+    // Verify error was logged with correct format
+    expect(core.error).toHaveBeenCalledWith('Step fail failed: Error: Step failed with exit code 1');
+  });
+
+  it('should handle multiple step failures in sequence', async () => {
+    // Mock failed executions
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ stdout: '', stderr: 'First failure', exitCode: 1 }) // First step
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }) // Reading outputs (empty)
+      .mockResolvedValueOnce({ stdout: '', stderr: 'Second failure', exitCode: 1 }) // Second step
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // Reading outputs (empty)
+    
+    (exec.exec as jest.Mock).mockResolvedValue(0); // For rm commands
+
+    const steps = [
+      {
+        name: 'Fail Step 1',
+        id: 'fail1',
+        run: 'exit 1'
+      },
+      {
+        name: 'Fail Step 2',
+        id: 'fail2',
+        run: 'exit 1'
+      }
+    ];
+
+    const matrix = { test: '1' };
+    
+    // Expect the first step to throw
+    await expect(executeSteps(steps, matrix)).rejects.toThrow('Step failed with exit code 1');
+    
+    // Verify error was logged for the first step only (second step shouldn't execute)
+    expect(core.error).toHaveBeenCalledTimes(1);
+    expect(core.error).toHaveBeenCalledWith('Step fail1 failed: Error: Step failed with exit code 1');
+  });
+
+  it('should include stderr in error output group', async () => {
+    // Mock failed execution with stderr
+    (exec.getExecOutput as jest.Mock)
+      .mockResolvedValueOnce({ 
+        stdout: 'Some output', 
+        stderr: 'Error: something went wrong\nMore error details', 
+        exitCode: 1 
+      }) // Step execution
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // Reading outputs (empty)
+    
+    (exec.exec as jest.Mock).mockResolvedValue(0); // For rm command
+
+    const steps = [{
+      name: 'Fail Step',
+      id: 'fail',
+      run: 'exit 1'
+    }];
+
+    const matrix = { test: '1' };
+    
+    // Execute and expect failure
+    await expect(executeSteps(steps, matrix)).rejects.toThrow('Step failed with exit code 1');
+    
+    // Verify both stdout and stderr were logged in the group
+    const infoCallArgs = (core.info as jest.Mock).mock.calls.map(call => call[0]);
+    
+    // Check stdout section
+    expect(infoCallArgs).toContain('\nStandard Output:');
+    expect(infoCallArgs).toContain('---------------');
+    expect(infoCallArgs).toContain('Some output');
+    
+    // Check stderr section
+    expect(infoCallArgs).toContain('\nStandard Error:');
+    expect(infoCallArgs).toContain('--------------');
+    expect(infoCallArgs).toContain('Error: something went wrong\nMore error details');
+  });
 }); 
