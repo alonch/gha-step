@@ -363,7 +363,7 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
       // Execute step
       const stepDescription = `Step "${step.name}" (${step.id}) - Matrix: ${JSON.stringify(matrix)}`;
       await core.group(stepDescription, async () => {
-        const { stdout, stderr } = await exec.getExecOutput('bash', ['-c', step.run], { 
+        const { stdout, stderr, exitCode } = await exec.getExecOutput('bash', ['-c', step.run], { 
           env, 
           silent: true, // Silent because we'll handle the output ourselves
           ignoreReturnCode: true // We'll handle the error ourselves
@@ -383,9 +383,9 @@ async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination):
           core.info(stderr.trim());
         }
 
-        // If the command failed, throw the error
-        if (stderr.trim()) {
-          throw new Error(`Step failed with error output`);
+        // If the command failed (non-zero exit code), throw the error
+        if (exitCode !== 0) {
+          throw new Error(`Step failed with exit code ${exitCode}`);
         }
       });
 
