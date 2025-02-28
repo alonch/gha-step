@@ -90,10 +90,30 @@ async function run(): Promise<void> {
     const baseMatrix = { ...matrixConfig[0] };
     delete baseMatrix.include;
 
-    // Combine all includes into the base matrix
+    // Process each matrix entry's includes sequentially
+    let currentMatrix = { ...baseMatrix };
+    let currentIncludes: any[] = [];
+
+    // Process includes in order from each matrix entry
+    for (const entry of matrixConfig) {
+      if (entry.include) {
+        if (Array.isArray(entry.include)) {
+          currentIncludes = currentIncludes.concat(entry.include);
+        } else if (typeof entry.include === 'string') {
+          try {
+            const parsedIncludes = JSON.parse(entry.include);
+            currentIncludes = currentIncludes.concat(parsedIncludes);
+          } catch (error) {
+            throw new Error(`Failed to parse include JSON string: ${error}`);
+          }
+        }
+      }
+    }
+
+    // Create final matrix with sequentially processed includes
     const combinedMatrix = {
-      ...baseMatrix,
-      include: matrixConfig.flatMap(entry => entry.include || [])
+      ...currentMatrix,
+      include: currentIncludes
     };
 
     // Generate matrix combinations
