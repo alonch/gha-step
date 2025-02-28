@@ -25739,8 +25739,12 @@ async function run() {
         validateMatrixConfig(matrixConfig);
         const steps = yaml.parse(stepsInput);
         const outputs = outputsInput ? yaml.parse(outputsInput) : [];
-        // Combine all includes into a single matrix entry
+        // Get base matrix configuration (non-include fields) from first entry
+        const baseMatrix = { ...matrixConfig[0] };
+        delete baseMatrix.include;
+        // Combine all includes into the base matrix
         const combinedMatrix = {
+            ...baseMatrix,
             include: matrixConfig.flatMap(entry => entry.include || [])
         };
         // Generate matrix combinations
