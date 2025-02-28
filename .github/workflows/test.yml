@@ -543,11 +543,11 @@ jobs:
           matrix: |
             - include: ${{ steps.include-only-test.outputs.json }}
             - include:
-              - demand: low        # This adds demand: low to ALL combinations
               - demand: high       # This overrides demand to high for combinations with fruit: orange
                 fruit: orange
               - demand: medium     # This overrides demand to medium for combinations with fruit: apple
                 fruit: apple
+              - demand: low        # This adds demand: low to ALL combinations
           steps: |
             - name: Echo Values
               id: echo
