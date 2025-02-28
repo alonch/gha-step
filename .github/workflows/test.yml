@@ -41,7 +41,7 @@ jobs:
           # Normalize and sort both JSONs
           output_sorted=$(normalize_and_sort '${{ steps.basic-test.outputs.json }}')
           expected_sorted=$(normalize_and_sort '[{"platform":"ubuntu-amd64","os":"ubuntu","arch":"amd64"},{"platform":"ubuntu-arm64","os":"ubuntu","arch":"arm64"},{"platform":"macos-amd64","os":"macos","arch":"amd64"},{"platform":"macos-arm64","os":"macos","arch":"arm64"}]')
-          
+
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
             echo "JSON comparison failed. Showing both versions:"
@@ -76,7 +76,7 @@ jobs:
         run: |
           output='${{ steps.array-test.outputs.json }}'
           expected='[{"os":"ubuntu","tags":["v1.0","latest","stable"],"arch":"x64"}]'
-          
+
           # Compare the outputs
           if [ "$(echo "$output" | jq -S .)" != "$(echo "$expected" | jq -S .)" ]; then
             echo "Array output test failed. Showing both versions:"
@@ -119,7 +119,7 @@ jobs:
           # Normalize and sort both JSONs
           output_sorted=$(normalize_and_sort '${{ steps.dependency-test.outputs.json }}')
           expected_sorted=$(normalize_and_sort '[{"config":"dev-config","result":"us-east-1-dev-config","env":"dev","region":"us-east-1"},{"config":"dev-config","result":"us-west-2-dev-config","env":"dev","region":"us-west-2"},{"config":"prod-config","result":"us-east-1-prod-config","env":"prod","region":"us-east-1"},{"config":"prod-config","result":"us-west-2-prod-config","env":"prod","region":"us-west-2"}]')
-          
+
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
             echo "JSON comparison failed. Showing both versions:"
@@ -178,7 +178,7 @@ jobs:
           end_time=$(date +%s)
           start_time=${{ steps.start-timer.outputs.start_time }}
           duration=$((end_time - start_time))
-          
+
           # Should complete in roughly 1-2 seconds since running in parallel
           if [ $duration -gt 3 ]; then
             echo "Execution took too long ($duration seconds), expected parallel execution"
@@ -206,7 +206,7 @@ jobs:
           end_time=$(date +%s)
           start_time=${{ steps.start-timer-sequential.outputs.start_time }}
           duration=$((end_time - start_time))
-          
+
           # Should take at least 5 seconds since running sequentially
           if [ $duration -lt 4 ]; then
             echo "Execution too fast ($duration seconds), expected sequential execution"
@@ -271,7 +271,7 @@ jobs:
             {"os":"ubuntu-latest","node":"14","setup":"ubuntu-latest-node14"},
             {"os":"ubuntu-latest","node":"16","setup":"ubuntu-latest-node16"}
           ]')
-          
+
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
             echo "JSON comparison failed. Showing both versions:"
@@ -287,7 +287,7 @@ jobs:
       - name: Validate Include Output
         run: |
           output='${{ steps.include-test.outputs.json }}'
-          
+
           # Check each expected combination
           expected_combinations=(
             # Matrix combinations with includes applied
@@ -354,7 +354,7 @@ jobs:
       - name: Validate Include-Only Output
         run: |
           output='${{ steps.include-only-test.outputs.json }}'
-          
+
           # Check each expected combination
           expected_combinations=(
             # Color includes get combined with other includes
@@ -410,7 +410,7 @@ jobs:
       - name: Validate JSON Include Output
         run: |
           output='${{ steps.json-include-test.outputs.json }}'
-          
+
           # Check each expected combination
           expected_combinations=(
             # Color includes get combined with other includes
@@ -483,11 +483,11 @@ jobs:
             {"fruit":"banana","color":"yellow","combo":"banana-yellow"},
             {"fruit":"banana","color":"brown","combo":"banana-brown"}
           ]'
-          
+
           # Normalize and sort both JSONs
           output_sorted=$(normalize_and_sort "$output")
           expected_sorted=$(normalize_and_sort "$expected")
-          
+
           # Compare the sorted JSONs
           if [ "$output_sorted" != "$expected_sorted" ]; then
             echo "Array include test failed. Showing both versions:"
@@ -523,7 +523,7 @@ jobs:
         run: |
           output='${{ steps.override-test.outputs.json }}'
           expected='[{"fruit":"banana","color":"red","shape":"round"}]'
-          
+
           # Compare the outputs
           if [ "$(echo "$output" | jq -S .)" != "$(echo "$expected" | jq -S .)" ]; then
             echo "Output override test failed. Showing both versions:"
@@ -534,4 +534,59 @@ jobs:
             echo "Showing diff:"
             diff -u <(echo "$expected" | jq .) <(echo "$output" | jq .) || true
             exit 1
-          fi 
+          fi
+
+      - name: Test Multi Include and JSON
+        id: json-multi-include-test
+        uses: ./
+        with:
+          matrix: |
+            - include: ${{ steps.include-only-test.outputs.json }}
+            - include:
+              - demand: low        # This adds demand: low to ALL combinations
+              - demand: high       # This overrides demand to high for combinations with fruit: orange
+                fruit: orange
+              - demand: medium     # This overrides demand to medium for combinations with fruit: apple
+                fruit: apple
+          steps: |
+            - name: Echo Values
+              id: echo
+              run: |
+                values=()
+                [ -n "$MATRIX_COLOR" ] && values+=("$MATRIX_COLOR")
+                [ -n "$MATRIX_ANIMAL" ] && values+=("$MATRIX_ANIMAL")
+                [ -n "$MATRIX_FRUIT" ] && values+=("$MATRIX_FRUIT")
+                [ -n "$MATRIX_SHAPE" ] && values+=("$MATRIX_SHAPE")
+                echo "combo=$(IFS=-; echo "${values[*]}")" >> $STEPS_OUTPUTS
+          outputs: |
+            - combo: ${ STEPS_ECHO_COMBO }
+
+      - name: Validate Multi Include Demand Output
+        run: |
+          output='${{ steps.json-multi-include-test.outputs.json }}'
+
+          # All validations in a single jq command
+          validation_errors=$(echo "$output" | jq '
+            # Check if any combination is missing demand
+            if any(.[]; has("demand") | not) then
+              "Error: Some combinations are missing demand value"
+            # Check if any apple has wrong demand
+            elif any(.[]; .fruit == "apple" and .demand != "medium") then
+              "Error: Found apple combination without medium demand"
+            # Check if any orange has wrong demand
+            elif any(.[]; .fruit == "orange" and .demand != "high") then
+              "Error: Found orange combination without high demand"
+            # Check if any other fruit has wrong demand
+            elif any(.[]; .fruit != "apple" and .fruit != "orange" and .demand != "low") then
+              "Error: Found non-apple/orange combination without low demand"
+            else
+              empty
+            end
+          ')
+
+          if [ -n "$validation_errors" ]; then
+            echo "$validation_errors"
+            echo "Full output:"
+            echo "$output" | jq .
+            exit 1
+          fi
