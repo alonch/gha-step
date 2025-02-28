@@ -86,12 +86,13 @@ async function run(): Promise<void> {
     const steps = yaml.parse(stepsInput) as StepDefinition[];
     const outputs = outputsInput ? yaml.parse(outputsInput) : [];
 
-    if (!matrixConfig[0]) {
-      throw new Error('Invalid matrix configuration');
-    }
+    // Combine all includes into a single matrix entry
+    const combinedMatrix = {
+      include: matrixConfig.flatMap(entry => entry.include || [])
+    };
 
     // Generate matrix combinations
-    const combinations: MatrixCombination[] = generateMatrixCombinations(matrixConfig[0]);
+    const combinations: MatrixCombination[] = generateMatrixCombinations(combinedMatrix);
     const results: any[] = [];
 
     if (maxParallel === 1) {
@@ -134,7 +135,7 @@ async function run(): Promise<void> {
 
 function generateMatrixCombinations(matrixConfig: { [key: string]: any }): MatrixCombination[] {
   let combinations: MatrixCombination[] = [];
-  
+
   // Handle regular matrix combinations
   const regularEntries = Object.entries(matrixConfig).filter(([key]) => key !== 'include');
   if (regularEntries.length > 0) {
@@ -161,7 +162,7 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
   // Handle includes
   if (matrixConfig.include) {
     let includes: MatrixInclude[] = [];
-    
+
     if (typeof matrixConfig.include === 'string') {
       // Parse JSON string include
       try {
@@ -176,10 +177,10 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
     // Process each include entry in order
     for (const include of includes) {
       // First, expand any array values in the include
-      const arrayEntries = Object.entries(include).filter(([_, value]) => 
+      const arrayEntries = Object.entries(include).filter(([_, value]) =>
         Array.isArray(value) || (typeof value === 'string' && value.includes(','))
       );
-      const scalarEntries = Object.entries(include).filter(([_, value]) => 
+      const scalarEntries = Object.entries(include).filter(([_, value]) =>
         !Array.isArray(value) && !(typeof value === 'string' && value.includes(','))
       );
 
@@ -323,12 +324,12 @@ function generateMatrixCombinations(matrixConfig: { [key: string]: any }): Matri
 export async function executeSteps(steps: StepDefinition[], matrix: MatrixCombination): Promise<StepOutputs> {
   const outputs: StepOutputs = {};
   const stepOutputs: { [stepId: string]: StepOutputs } = {};
-  
+
   // Generate a unique identifier for this execution
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(7);
   const uniqueId = `${timestamp}-${randomStr}`;
-  
+
   const env: ProcessEnv = {
     ...process.env as ProcessEnv,
     STEPS_OUTPUTS: `steps-outputs-${uniqueId}.env`,
@@ -367,8 +368,8 @@ export async function executeSteps(steps: StepDefinition[], matrix: MatrixCombin
       let outputBuffer: string[] = [];
 
       // Collect all outputs before starting the group
-      const { stdout, stderr, exitCode } = await exec.getExecOutput('bash', ['-c', step.run], { 
-        env, 
+      const { stdout, stderr, exitCode } = await exec.getExecOutput('bash', ['-c', step.run], {
+        env,
         silent: true, // Silent because we'll handle the output ourselves
         ignoreReturnCode: true // We'll handle the error ourselves
       });
@@ -398,7 +399,7 @@ export async function executeSteps(steps: StepDefinition[], matrix: MatrixCombin
       // Try to read step outputs
       try {
         const { stdout: outputStdout } = await exec.getExecOutput('cat', [env.STEPS_OUTPUTS], { silent: true });
-        
+
         // Only add outputs section if there are outputs
         if (outputStdout.trim()) {
           outputBuffer.push('\nStep Outputs:');

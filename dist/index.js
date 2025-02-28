@@ -25739,11 +25739,12 @@ async function run() {
         validateMatrixConfig(matrixConfig);
         const steps = yaml.parse(stepsInput);
         const outputs = outputsInput ? yaml.parse(outputsInput) : [];
-        if (!matrixConfig[0]) {
-            throw new Error('Invalid matrix configuration');
-        }
+        // Combine all includes into a single matrix entry
+        const combinedMatrix = {
+            include: matrixConfig.flatMap(entry => entry.include || [])
+        };
         // Generate matrix combinations
-        const combinations = generateMatrixCombinations(matrixConfig[0]);
+        const combinations = generateMatrixCombinations(combinedMatrix);
         const results = [];
         if (maxParallel === 1) {
             // Execute sequentially
